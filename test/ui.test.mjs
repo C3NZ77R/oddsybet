@@ -196,3 +196,12 @@ test('Props: la línea por defecto del detalle es la misma que la del servidor (
   for (const v of [[7, 9, 8, 12, 5, 6, 11, 10], [0, 0, 1, 0, 2, 0, 0, 1, 0]]) assert.equal(medianLine(v), propLine(v).line);
   assert.equal(medianLine([]), 0.5);
 });
+
+test('picks del día: dayText resume las apuestas más probables para WhatsApp', async () => {
+  const { dayText } = await import('../public/views/picks.js');
+  const g = { home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
+  const rows = [[g, [{ market: '1x2', name: 'Millonarios', p: 0.55, minOdds: 1.85 }, { market: 'total', label: 'Total', name: 'Más de 2.5', p: 0.6, minOdds: 1.7 }]]];
+  const t = dayText('Liga BetPlay', rows);
+  assert.match(t, /Liga BetPlay/);
+  assert.ok(t.indexOf('Más de 2.5') < t.indexOf('Gana Millonarios')); // la más probable primero
+});

@@ -135,6 +135,14 @@ async function sharePicks() {
   }
 }
 
+function shareWhatsApp() {
+  const picks = store.get('picks');
+  const url = `${location.origin}${location.pathname}#/share?p=${encodePicks(picks)}`;
+  const lines = picks.slice(0, 10).map((p) => `• ${p.label} @ ${fmtOdds(p.price)}`);
+  const text = `Mis picks en Oddsy Bet (cuotas del modelo):\n${lines.join('\n')}\n${url}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+}
+
 // ---------- boleto ----------
 const leagueTitle = (id) => leagueById(id)?.title ?? id;
 const combined = (list) => {
@@ -172,7 +180,7 @@ function renderSlip() {
       <div><dt>Probabilidad según la cuota</dt><dd>${fmtPct(total ? 1 / total : null, 1)}</dd></div>
     </dl>
     <p class="slip-note">La cuota combinada es solo una referencia. Si juntas picks del mismo partido, unos dependen de otros, y cada casa tiene sus propias reglas para combinarlos.</p>
-    <div class="slip-actions"><button type="button" class="btn btn-primary" data-share>Compartir</button><button type="button" class="btn" data-clear>Vaciar</button></div>`;
+    <div class="slip-actions"><button type="button" class="btn btn-primary" data-share>Compartir</button><button type="button" class="btn" data-share-wa>WhatsApp</button><button type="button" class="btn" data-clear>Vaciar</button></div>`;
 }
 
 const wide = window.matchMedia('(min-width: 1280px)');
@@ -226,6 +234,7 @@ $('#slip').addEventListener('click', (e) => {
   const rm = e.target.closest('[data-remove]');
   if (rm) { store.removePick(rm.dataset.remove); $('#slipTitle').focus(); return; }
   if (e.target.closest('[data-slip-close]')) return closeSlip(true);
+  if (e.target.closest('[data-share-wa]')) return shareWhatsApp();
   if (e.target.closest('[data-share]')) return sharePicks();
   if (e.target.closest('[data-clear]') && window.confirm('¿Vaciar todos los picks del boleto?')) store.set('picks', []);
 });

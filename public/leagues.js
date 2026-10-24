@@ -9,7 +9,7 @@ export const LEAGUES = [
   { id: 'epl', title: 'Premier League', sport: 'soccer', espn: 'eng.1' },
   { id: 'ucl', title: 'Champions', sport: 'soccer', espn: 'uefa.champions' },
   { id: 'libertadores', title: 'Libertadores', sport: 'soccer', espn: 'conmebol.libertadores' },
-  { id: 'colombia', title: 'Liga BetPlay', sport: 'soccer', espn: 'col.1', props: false },
+  { id: 'colombia', title: 'Liga BetPlay', sport: 'soccer', espn: 'col.1' },
   { id: 'atp', title: 'ATP', sport: 'tennis', espn: 'atp' },
 ];
 

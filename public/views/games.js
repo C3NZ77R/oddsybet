@@ -115,7 +115,9 @@ function mainHtml(g, mk, ctx) {
   if (mk.accuracy?.publish === false) return `<p class="gm-src">${NO_PUBLISH}.</p>`;
   const m = mainMarket(mk.by.get(String(g.id)));
   if (!m) return '<p class="gm-src">Oddsy no tiene cuotas para este partido.</p>';
-  return `<div class="gm-mkh">${esc(m.label)}</div><div class="gm-sels">${m.selections.map((s) => selBtn(g, m, s, ctx)).join('')}</div>`;
+  const a = mk.accuracy;
+  const chip = a?.brier != null ? `<span class="gm-acc-chip" title="${esc(accText(a))}">Brier ${a.brier.toFixed(3)} vs ${a.baseline?.brier?.toFixed(3) ?? '—'} · ${esc(a.n)} partidos</span>` : '';
+  return `<div class="gm-mkh">${esc(m.label)}${chip}</div><div class="gm-sels">${m.selections.map((s) => selBtn(g, m, s, ctx)).join('')}</div>`;
 }
 
 function cardHtml(g, league, extra) {

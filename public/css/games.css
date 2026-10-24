@@ -143,3 +143,5 @@
   .gm-main, .gm-side { padding: 10px; }
   .gm-tag { display: block; }
 }
+
+.gm-acc-chip { float: right; font-weight: 500; text-transform: none; letter-spacing: 0; cursor: help; }

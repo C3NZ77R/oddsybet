@@ -179,3 +179,10 @@ test('getProps(liga) de noche: si ya empezaron todos los de hoy, los de mañana 
   assert.deepEqual(urls.filter((u) => u.includes('/scoreboard')).map((u) => new URL(u).searchParams.get('dates')), [null, '20261022']);
   assert.deepEqual(new Set(res.data.map((p) => p.gameId)), new Set(['96465', '96667']));
 });
+
+test('props: fútbol (Liga BetPlay) cotiza goles y tiros a partir del game log', () => {
+  const games = Array.from({ length: 12 }, (_, i) => ({ minutes: 90, stats: { goals: i % 3 === 0 ? 1 : 0, shots: 2 + (i % 3), sot: i % 2, yc: 0 } }));
+  const out = playerProps({ athlete: { id: '9', name: 'Delantero' }, games }, 'soccer', { league: 'colombia', gameId: 'g1', start: '2026-11-01T19:00Z', team: 'AME', opp: 'MIL' });
+  assert.ok(out.some((p) => p.market === 'player_shots' && p.side === 'Over'));
+  assert.ok(out.every((p) => p.league === 'colombia' && p.books[0].price > 1));
+});
