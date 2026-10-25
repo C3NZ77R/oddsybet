@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { propLine, playerProps, getProps } from '../lib/props.mjs';
+import { propLine, playerProps, getProps, oppEvents, oppTotals, oppFactor, withOpp, OPP } from '../lib/props.mjs';
 import { normGamelog, buildGameLog } from '../lib/espn.mjs';
 import { normalOver } from '../lib/pricing.mjs';
 import { propOver } from '../public/betmath.js';
@@ -185,4 +185,29 @@ test('props: fútbol (Liga BetPlay) cotiza goles y tiros a partir del game log',
   const out = playerProps({ athlete: { id: '9', name: 'Delantero' }, games }, 'soccer', { league: 'colombia', gameId: 'g1', start: '2026-11-01T19:00Z', team: 'AME', opp: 'MIL' });
   assert.ok(out.some((p) => p.market === 'player_shots' && p.side === 'Over'));
   assert.ok(out.every((p) => p.league === 'colombia' && p.books[0].price > 1));
+});
+
+test('rival: oppEvents/oppTotals suman lo permitido contra la media previa; el factor escala media y varianza', () => {
+  // 10 partidos de 10 puntos (del más reciente al más viejo) y el más reciente, 20 contra el equipo 7.
+  const games = [{ minutes: 30, date: '2026-01-11', opp: { id: 7 }, stats: { pts: 20 } },
+    ...Array.from({ length: 10 }, (_, i) => ({ minutes: 30, date: `2026-01-0${i}`, opp: { id: 9 }, stats: { pts: 10 } }))];
+  const ev = oppEvents(games, ['pts']);
+  assert.equal(ev.length, 3); // con al menos 8 previos: los 2 más viejos no cuentan
+  assert.deepEqual(oppTotals(ev)['7'].pts, { v: 20, e: 10 });
+  const cfg = OPP.nba;
+  const f = oppFactor({ v: 20, e: 10 }, 10, cfg);
+  assert.ok(Math.abs(f - (420 / 410) ** cfg.w) < 1e-12); // k·m20 = 40·10
+  assert.equal(oppFactor(null, 10, cfg), 1);
+  const r = propLine(Array(20).fill(10), 'count');
+  const up = withOpp(r, 'count', 1.2);
+  assert.ok(Math.abs(up.mean - r.mean * 1.2) < 1e-12 && Math.abs(up.variance - r.variance * 1.2) < 1e-12 && up.pOver > r.pOver);
+  assert.equal(withOpp(r, 'binary', 1.2), r);
+});
+
+test('playerProps: con el rival en contra de los puntos sube la P(Más) de pts y no toca las demás', () => {
+  const plain = playerProps(nbaLog(), 'basketball', ctx);
+  const tough = playerProps(nbaLog(), 'basketball', { ...ctx, oppStats: { cfg: OPP.nba, totals: { pts: { v: 1100, e: 1000 } } } });
+  const over = (ps, s) => ps.find((p) => p.stat === s && p.side === 'Over');
+  assert.ok(over(tough, 'pts').p > over(plain, 'pts').p);
+  assert.equal(over(tough, 'reb')?.p, over(plain, 'reb')?.p);
 });
