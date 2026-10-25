@@ -5,7 +5,7 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
-import { predict, score, baseline, halves, fitNormal, adjust, cutOf, LAG, SIGMAS, politeFetch, eloStep, predictAtp, scoreAtp, rankBaseline } from '../scripts/backtest.mjs';
+import { predict, score, baseline, halves, fitNormal, adjust, cutOf, LAG, SIGMAS, politeFetch, eloStep, predictAtp, scoreAtp, formBaseline } from '../scripts/backtest.mjs';
 import { eloFrom, finished, matchProb, normScoreboard } from '../lib/tennis.mjs';
 import { ratingsFromResults, expected, MU_SHRINK, SIGMA } from '../lib/ratings.mjs';
 
@@ -261,12 +261,15 @@ test('atp: Brier y log-loss del modelo sobre la p de A', () => {
   close(m.logloss, -(Math.log(0.8) + Math.log(0.4)) / 2);
 });
 
-test('atp: la referencia da por ganador al mejor rankeado; sin ranking cuenta como 1000', () => {
-  const rankings = [{ rank: 1, player: { id: 'x' } }, { rank: 50, player: { id: 'y' } }];
-  const preds = [{ a: 'x', b: 'y', outcome: 'H' }, { a: 'z', b: 'y', outcome: 'H' }, { a: 'z', b: 'w', outcome: 'A' }];
-  const b = rankBaseline(preds, rankings);
-  close(b.brier, (0 + 1 + 0.25) / 3); // acierta, falla y empate de no rankeados a 0.5
-  assert.ok(b.logloss > 9); // un pronóstico seguro que falla paga −ln(1e-12)
+test('atp: la referencia de forma usa solo las victorias previas y ajusta c en la temporada anterior', () => {
+  // x le gana siempre a y en 2025; en 2026 sigue igual: con c > 0 la forma le da más del 50 % a x.
+  const ms = [];
+  for (let i = 0; i < 10; i++) ms.push(M(`a${i}`, `2025-0${1 + (i % 9)}-1${i % 9}T10:00Z`, 'x', 'y', 'a'));
+  for (let i = 0; i < 4; i++) ms.push(M(`b${i}`, `2026-0${1 + i}-15T10:00Z`, i % 2 ? 'y' : 'x', i % 2 ? 'x' : 'y', i % 2 ? 'b' : 'a'));
+  const b = formBaseline(ms, 2026);
+  assert.ok(b.c > 0);
+  assert.equal(b.n, 4);
+  assert.ok(b.brier < 0.25, `${b.brier}`); // mejor que una moneda
 });
 
 test('backtest: settle liquida cada mercado con el marcador final (null = devolución)', async () => {

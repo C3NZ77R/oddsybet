@@ -19,7 +19,7 @@ export default {
   async render(el, { api, navigate }) {
     const { data } = await api.tennisRankings();
     el.innerHTML = h`<header class="view-head"><div><h1>Ranking ATP</h1>
-      <p class="hint">Los 150 mejores en individuales. El Elo mide el nivel de cada jugador con sus partidos de los últimos 24 meses. Toca un jugador para ver su ficha.</p></div>${sourceBadge('espn')}</header>
+      <p class="hint">Los 150 mejores en individuales. El Elo mide el nivel de cada jugador con sus partidos desde 2018. Toca un jugador para ver su ficha.</p></div>${sourceBadge('espn')}</header>
       <p><a class="gm-more" href="#/atp/games">Partidos ATP →</a></p>`;
     el.append(sortableTable({ columns: COLUMNS, rows: data, sortKey: 'rank', sortDir: 'asc', caption: 'Ranking ATP', onRowClick: (r) => navigate(`#/tennis-player/${encodeURIComponent(r.player.id)}`) }));
   },

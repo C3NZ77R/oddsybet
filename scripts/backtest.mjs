@@ -6,16 +6,16 @@
 // el k, σ y σ_T que imprime valen para copiar a lib/ratings.mjs solo si corrieron todas las ligas del deporte).
 // Cada JSON de ESPN que responde bien queda en .cache/espn/: una corrida cortada reanuda sin volver a pedirlo
 // (temporadas ya jugadas; borrar la carpeta para refrescar la vigente).
-// atp: sin red salvo el ranking; los partidos salen de data/atp-history.json (scripts/tennis-snapshot.mjs).
+// atp: sin red; los partidos salen de data/atp-elo.json (desde 2018) y data/atp-history.json (24 meses).
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { LEAGUES, leagueById } from '../public/leagues.js';
-import { getPastSeason, thinSeason } from '../lib/espn.mjs';
+import { getPastSeason, thinSeason, uniqueById } from '../lib/espn.mjs';
 import { ratingsFromResults, expected, SPORT_MODEL, SIGMA, SIGMA_T, MU_SHRINK } from '../lib/ratings.mjs';
 import { marketsFor } from '../lib/markets.mjs';
-import { finished, matchProb, getRankings, eloStep } from '../lib/tennis.mjs';
+import { finished, matchProb, eloStep, eloSnapshot } from '../lib/tennis.mjs';
 
 export const LAG = 6 * 3_600_000;
 const DAY = 86_400_000;
@@ -216,23 +216,38 @@ export function predictAtp(matches, season) {
 // p = P(gana A), igual al ml de marketsFor('tennis'): serveFromMatchProb la reproduce en matchDist.
 export const scoreAtp = (preds) => metrics('tennis', preds.map(({ p, outcome }) => ({ outcome, p: { H: p, A: 1 - p } })));
 
-// Referencia: gana el mejor rankeado (p = 1); sin ranking cuenta como 1000 y dos iguales dan 0.5.
-export function rankBaseline(preds, rankings) {
-  const rank = new Map(rankings.map((r) => [r.player.id, r.rank]));
-  const r = (id) => rank.get(id) ?? 1000;
-  return metrics('tennis', preds.map(({ a, b, outcome }) => {
-    const H = r(a) < r(b) ? 1 : r(a) > r(b) ? 0 : 0.5;
-    return { outcome, p: { H, A: 1 - H } };
-  }));
+// Referencia: la forma, sin fuga. q = (victorias + 1) / (partidos + 2) de cada jugador en las 52 semanas previas y
+// P(gana A) = logística de c·(logit qa − logit qb), con c el de menor log-loss en la temporada anterior.
+export function formBaseline(matches, season) {
+  const ms = finished(matches).filter((m) => !m.retired);
+  const recent = new Map(); // id -> [[t, ganó]]
+  const rows = [];
+  for (const m of ms) {
+    const t = Date.parse(m.date), y = new Date(t).getUTCFullYear();
+    const q = (id) => {
+      const r = (recent.get(id) ?? []).filter(([d]) => t - d < 364 * DAY);
+      recent.set(id, r);
+      return (r.filter(([, w]) => w).length + 1) / (r.length + 2);
+    };
+    if (y === season || y === season - 1) rows.push({ y, x: Math.log(q(m.a.id) / (1 - q(m.a.id))) - Math.log(q(m.b.id) / (1 - q(m.b.id))), outcome: m.winner === 'a' ? 'H' : 'A' });
+    for (const [id, w] of [[m.a.id, m.winner === 'a'], [m.b.id, m.winner === 'b']]) (recent.get(id) ?? recent.set(id, []).get(id)).push([t, w]);
+  }
+  const at = (c, rs) => metrics('tennis', rs.map(({ x, outcome }) => ({ outcome, p: { H: 1 / (1 + Math.exp(-c * x)), A: 1 - 1 / (1 + Math.exp(-c * x)) } })));
+  const fit = rows.filter((r) => r.y === season - 1);
+  const c = Array.from({ length: 31 }, (_, i) => i / 20).reduce((a, b) => (at(b, fit).logloss < at(a, fit).logloss ? b : a));
+  return { c, ...at(c, rows.filter((r) => r.y === season)) };
 }
 
+const atpMatches = async () => [...eloSnapshot(), ...JSON.parse(await readFile(ATP, 'utf8')).matches];
+
 async function atpEntry() {
-  const preds = predictAtp(JSON.parse(await readFile(ATP, 'utf8')).matches, ATP_SEASON);
+  const matches = finished(uniqueById(await atpMatches()));
+  const preds = predictAtp(matches, ATP_SEASON);
   const m = scoreAtp(preds);
-  const b = rankBaseline(preds, await getRankings());
+  const b = formBaseline(matches, ATP_SEASON);
   const out = { season: ATP_SEASON, n: m.n, brier: r4(m.brier), logloss: r4(m.logloss), baseline: { brier: r4(b.brier), logloss: r4(b.logloss) } };
   return { ...out, publish: out.brier < out.baseline.brier,
-    note: 'La referencia (gana el mejor rankeado) usa el ranking ATP actual, que ya conoce los resultados de la temporada.' };
+    note: 'La referencia es la forma: victorias de cada jugador en las 52 semanas previas, convertidas en probabilidad con lo ajustado en la temporada anterior.' };
 }
 
 const r2 = (x) => Math.round(x * 100) / 100;

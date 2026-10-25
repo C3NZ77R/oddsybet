@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { marketsFor, getMarkets } from '../lib/markets.mjs';
 import { scoreGrid, normalOver, halfLine, MAX_P, publishable } from '../lib/pricing.mjs';
-import { matchDist, setGames, getHistory, eloFrom, matchProb } from '../lib/tennis.mjs';
+import { matchDist, setGames, getHistory, getEloHistory, eloFrom, matchProb } from '../lib/tennis.mjs';
 import { getSeasonResults } from '../lib/espn.mjs';
 import { ratingsFromResults, expected } from '../lib/ratings.mjs';
 
@@ -306,7 +306,7 @@ test('mercados: un partido de tenis terminado se cotiza con el Elo de antes de j
   (u) => (/\/rankings$/.test(u.pathname) ? fx('atp-rankings.json') : /\/scoreboard$/.test(u.pathname) ? fx('atp-month.json') : null),
   async () => {
     const { data } = await getMarkets('atp', { game: '182677', date: '20260913' });
-    const history = await getHistory();
+    const history = await getEloHistory(); // el Elo usa la historia larga (data/atp-elo.json) más la de 24 meses
     const m = history.find((x) => x.id === '182677');
     const p = (elo) => matchProb(elo, m.a.id, m.b.id, m.surface);
     const ml = sel(pick(data.markets, 'ml'), 'A. Zverev').p; // la de matchDist: reproduce p a 1e-4

@@ -77,7 +77,7 @@ export default {
     const state = { surface: '', stat: 'total_games', line: LINES.total_games[0] };
     el.innerHTML = h`<a class="gm-back" href="#/tennis-rankings">← Ranking ATP</a>
       ${headHtml(data)}
-      <div class="toolbar" data-bar><span class="tn-muted">${sourceBadge('espn')} Elo: nivel del jugador según Oddsy, con sus partidos de los últimos 24 meses</span></div>
+      <div class="toolbar" data-bar><span class="tn-muted">${sourceBadge('espn')} Elo: nivel del jugador según Oddsy, con sus partidos desde 2018</span></div>
       <section class="card tn-sec"><h2 data-title></h2><div data-hits></div></section>
       <section class="tn-sec"><h2>Últimos partidos</h2><div data-table></div></section>`;
     const table = sortableTable({ columns: COLUMNS, sortKey: 'date', sortDir: 'desc', pageSize: 25, caption: `Últimos partidos de ${data.player.name}`, emptyText: 'Sin partidos en esta superficie.' });
