@@ -1,12 +1,11 @@
-// Backtest de En vivo (public/live.js) en la última temporada completa de NFL y NBA. Con el marcador al terminar el
+// Backtest de En vivo (public/live.js) en la última temporada completa de la NBA. Con el marcador al terminar el
 // 1.º, 2.º y 3.er cuarto (25, 50 y 75 % del partido) calcula P(Más) del total como la vista (remaining + liveOver)
 // contra la línea previa de Oddsy: el mercado 'ou' de marketsFor con el modelo sin fuga de scripts/backtest.mjs
 // (getMarkets usaría los ratings de hoy, que ya conocen esos resultados). Para cada peso del promedio previo
 // (PRIOR.total) mide log-loss, Brier y una tabla por deciles; con paceZ y strength, cuántas señales de cada nivel salen
-// y cuántas aciertan su lado contra esa línea. Escribe docs/accuracy.json → live. Uso: node scripts/live-backtest.mjs [nfl] [nba]
+// y cuántas aciertan su lado contra esa línea. Escribe docs/accuracy.json → live. Uso: node scripts/live-backtest.mjs [nba]
 // El marcador por cuarto sale de los linescores del scoreboard de cada día (~100 KB): en esos cortes es el mismo que el
 // de las jugadas del summary (~0.5 MB por partido). Todo queda en .cache/espn/ vía politeFetch.
-// Props de jugador: las jugadas de la NFL en el summary solo traen equipos, no atletas, así que no se reconstruyen.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { leagueById } from '../public/leagues.js';
@@ -17,7 +16,7 @@ import { politeFetch, predict } from './backtest.mjs';
 
 export const PRIORS = [1, 2, 3, 5, 8];
 export const CUTS = [1, 2, 3]; // cuartos terminados: f = k / 4
-const LEAGUES = ['nfl', 'nba'];
+const LEAGUES = ['nba'];
 const EPS = 1e-12;
 const OUT = new URL('../docs/accuracy.json', import.meta.url);
 const CACHE = fileURLToPath(new URL('../.cache/espn/', import.meta.url));

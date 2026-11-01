@@ -45,7 +45,6 @@ const HOW = {
   cs: () => 'Aciertas solo si el marcador final es exactamente ese.',
   ah: (n, t) => shift(n, t, 'goles') + QUARTER,
   spread: (n, t) => shift(n, t, 'puntos'),
-  rl: (n, t) => shift(n, t, 'carreras'),
   sets: () => 'Aciertas solo si el marcador en sets es exactamente ese.',
   ou_sets: (n, t) => `Más ${t} gana si se juega un ${ORD[Math.ceil(t)] ?? `${Math.ceil(t)}.º`} set; Menos ${t}, si el partido se acaba antes.`,
   ou_games: (n, t) => count('todos los games del partido', t),

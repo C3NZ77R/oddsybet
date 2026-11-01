@@ -155,12 +155,12 @@ const mockEspn = (t, scoreboard, down = () => false) => {
 test('getProps: con más del 10 % de plantillas o de game logs caídos, 502 (no se cachea un vacío); uno caído entre 18 sigue', async (t) => {
   let down = (u) => u.pathname.endsWith('/roster');
   mockEspn(t, () => board([['70', '71', 'pre', '2026-10-21T23:00Z'], ['72', '73', 'pre', '2026-10-21T23:00Z'], ['74', '75', 'pre', '2026-10-21T23:00Z']]), (u) => down(u));
-  await assert.rejects(getProps('mlb'), { status: 502, message: /plantillas/ }); // antes: 200 con data: [] y 30 min en la CDN
+  await assert.rejects(getProps('ucl'), { status: 502, message: /plantillas/ }); // antes: 200 con data: [] y 30 min en la CDN
   const failed = (ids) => (u) => ids.some((id) => u.pathname.endsWith(`/athletes/${id}/gamelog`));
   down = failed(['7004433188', '7105142621']); // 2 de 18 jugadores
-  await assert.rejects(getProps('mlb'), { status: 502, message: /game logs/ });
+  await assert.rejects(getProps('ucl'), { status: 502, message: /game logs/ });
   down = failed(['7004433188']);
-  assert.ok(Array.isArray((await getProps('mlb')).data));
+  assert.ok(Array.isArray((await getProps('ucl')).data));
 });
 
 test('getProps: un 404 (jugador sin game log) no cuenta como caída', async (t) => {

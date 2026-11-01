@@ -1,5 +1,5 @@
 // Backtest de PRIOR.player (public/live.js): cuántos partidos pesa el promedio previo de un jugador frente a su ritmo de
-// hoy. NBA 2025-26, porque sus jugadas del summary traen el atleta (las de la NFL solo el equipo). En una muestra pareja de
+// hoy. NBA 2025-26, porque sus jugadas del summary traen el atleta. En una muestra pareja de
 // la temporada reconstruye los puntos, rebotes y asistencias de cada jugador al final del 1.º, 2.º y 3.er cuarto; su línea
 // previa sale de propLine con el game log anterior al partido (sin fuga), elegidos como getProps (los 8 de cada equipo
 // con más minutos). Para cada peso calcula P(Más) como propSignals (remaining + liveOver con la curva de los jugadores,

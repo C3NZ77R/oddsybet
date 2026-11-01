@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { predict, score, baseline, halves, fitNormal, adjust, cutOf, LAG, SIGMAS, politeFetch, eloStep, predictAtp, scoreAtp, rankBaseline } from '../scripts/backtest.mjs';
 import { eloFrom, finished, matchProb, normScoreboard } from '../lib/tennis.mjs';
-import { ratingsFromResults, expected, MU_SHRINK, SIGMA } from '../lib/ratings.mjs';
+import { ratingsFromResults, expected, MU_SHRINK } from '../lib/ratings.mjs';
 
 const R = (id, date, homeId, awayId, homeScore, awayScore) => ({ id, date, homeId, awayId, homeScore, awayScore, neutral: false });
 const close = (a, b, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
@@ -121,7 +121,7 @@ test('backtest: fitNormal saca k por mínimos cuadrados sin intercepto, el desv�
   assert.equal(ps[0].model.mu, 8); // no muta la entrada
 });
 
-test('backtest: σ de basketball = menor log-loss de la grilla tras aplicar k; fútbol americano conserva su σ', () => {
+test('backtest: σ de basketball = menor log-loss de la grilla tras aplicar k', () => {
   // mu 10 y márgenes 12, 8, 15, −5: k relativo 0.75 → mu 7.5; gana 3 de 4, así que el ml del local debe dar ≈ 0.75.
   const ps = [N(10, 12), N(10, 8), N(10, 15), N(10, -5)];
   const f = fitNormal('basketball', ps);
@@ -130,7 +130,6 @@ test('backtest: σ de basketball = menor log-loss de la grilla tras aplicar k; f
   close(f.residualSd, Math.sqrt((4.5 ** 2 + 0.5 ** 2 + 7.5 ** 2 + 12.5 ** 2) / 4));
   const ll = (s) => score('basketball', adjust(ps, { ...f, sigma: s })).logloss;
   for (const s of SIGMAS) assert.ok(ll(f.sigma) <= ll(s));
-  assert.equal(fitNormal('football', ps).sigma, SIGMA.football);
   assert.equal(fitNormal('basketball', [N(0, 3), N(0, -3)]).kRel, 1); // sin mu no hay pendiente que estimar
 });
 

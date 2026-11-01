@@ -5,7 +5,7 @@ import { h, fmtPct, fmtOdds, when, empty, ymd } from '../ui.js';
 // "Local o empate" → "Millonarios o empate"; el tenis ya trae los nombres de los jugadores.
 const named = (text, g) => String(text).replace(/\bLocal\b/g, g.home?.name ?? 'Local').replace(/\bVisitante\b/g, g.away?.name ?? 'Visitante');
 const signed = (x) => (x > 0 ? `+${x}` : `${x}`);
-const HCP = { spread: 'hándicap', rl: 'hándicap de carreras', games_hcp: 'hándicap de games' };
+const HCP = { spread: 'hándicap', games_hcp: 'hándicap de games' };
 const pickText = (p, g) => named(HCP[p.market] ? `${p.name} ${signed(p.line)} (${HCP[p.market]})`
   : p.market === '1x2' || p.market === 'ml' ? (p.name === 'Empate' ? 'Empate' : `Gana ${p.name}`)
     : `${p.label}: ${p.name}`, g);

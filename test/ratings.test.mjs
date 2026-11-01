@@ -316,13 +316,13 @@ test('getSeasonResults: en playoffs pide la fase regular vigente y no la tempora
   ] });
   const reg = (teamId) => ({ requestedSeason: { year: 2026, type: 2 }, events: games(`rg${teamId}-`, teamId, 12) });
   const routes = {
-    'baseball/mlb/teams/10/schedule': post('10'),
-    'baseball/mlb/teams/19/schedule': post('19'),
-    'baseball/mlb/teams/10/schedule?seasontype=2': reg('10'),
-    'baseball/mlb/teams/19/schedule?seasontype=2': reg('19'),
+    'basketball/nba/teams/10/schedule': post('10'),
+    'basketball/nba/teams/19/schedule': post('19'),
+    'basketball/nba/teams/10/schedule?seasontype=2': reg('10'),
+    'basketball/nba/teams/19/schedule?seasontype=2': reg('19'),
   };
   await withFetch(routes, async (urls) => {
-    const res = await getSeasonResults('mlb', { teamIds: ['10', 19] });
+    const res = await getSeasonResults('nba', { teamIds: ['10', 19] });
     assert.equal(res.length, 2 * (2 + 12));
     assert.ok(!res.some((r) => r.id.startsWith('pp')), 'aplazado 0-0 fuera');
     assert.ok(!urls.some((u) => u.includes('season=')));
@@ -343,8 +343,8 @@ test('getSeasonResults: si ESPN falla en demasiados calendarios es un error 502,
   await withFetch({ 'basketball/wnba/teams/1/schedule': ok, 'basketball/wnba/teams/2/schedule': 503 }, async () => {
     await assert.rejects(getSeasonResults('wnba', { teamIds: ['1', '2'] }), { status: 502 });
   });
-  await withFetch({ 'football/nfl/teams': { sports: [{ leagues: [{ teams: [] }] }] } }, async () => {
-    await assert.rejects(getSeasonResults('nfl'), { status: 502 });
+  await withFetch({ 'soccer/uefa.champions/teams': { sports: [{ leagues: [{ teams: [] }] }] } }, async () => {
+    await assert.rejects(getSeasonResults('ucl'), { status: 502 });
   });
 });
 
@@ -360,8 +360,8 @@ test('getSeasonResults: a lo sumo 6 calendarios en vuelo', async () => {
     return new Response(JSON.stringify({ requestedSeason: { year: 2026, type: 2 }, events: games(`c${id}-`, id, 12) }));
   };
   try {
-    const ids = Array.from({ length: 40 }, (_, i) => String(i + 1));
-    assert.equal((await getSeasonResults('nfl', { teamIds: ids })).length, 40 * 12);
+    const ids = Array.from({ length: 40 }, (_, i) => String(i + 101)); // equipos que no pidió otro test (sus calendarios quedan en memoria)
+    assert.equal((await getSeasonResults('nba', { teamIds: ids })).length, 40 * 12);
     assert.equal(calls, 40); // 12 partidos por equipo: sin la temporada anterior
     assert.equal(peak, 6);
   } finally {

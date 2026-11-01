@@ -20,7 +20,6 @@ import { finished, matchProb, getRankings, eloStep } from '../lib/tennis.mjs';
 export const LAG = 6 * 3_600_000;
 const DAY = 86_400_000;
 export const SIGMAS = Array.from({ length: 33 }, (_, i) => 8 + i / 2);
-const GRID = { basketball: SIGMAS }; // football conserva el σ de la literatura
 const EPS = 1e-12; // log(0) sería Infinity, que JSON guarda como null
 const OUT = new URL('../docs/accuracy.json', import.meta.url);
 const CACHE = fileURLToPath(new URL('../.cache/espn/', import.meta.url));
@@ -187,9 +186,8 @@ export function fitNormal(sport, preds) {
   const kRel = den > 0 ? sum(preds, (p) => p.margin * p.model.mu) / den : 1;
   const rms = (f) => Math.sqrt(sum(preds, (p) => f(p) ** 2) / preds.length);
   const sigmaT = rms((p) => p.points - p.model.total);
-  const grid = GRID[sport] ?? [SIGMA[sport]];
-  const loss = grid.map((sigma) => score(sport, adjust(preds, { kRel, sigma, sigmaT })).logloss);
-  const sigma = grid[loss.indexOf(Math.min(...loss))]; // empate = el menor
+  const loss = SIGMAS.map((sigma) => score(sport, adjust(preds, { kRel, sigma, sigmaT })).logloss);
+  const sigma = SIGMAS[loss.indexOf(Math.min(...loss))]; // empate = el menor
   return { k: MU_SHRINK[sport] * kRel, kRel, sigma, residualSd: rms((p) => p.margin - kRel * p.model.mu), sigmaT };
 }
 
@@ -272,8 +270,7 @@ async function main(args) {
     fits[sport] = f;
     console.log(`${sport}: k ${r2(f.k)}, σ ${f.sigma} (desvío real ${r2(f.residualSd)}), σ_T ${r1(f.sigmaT)}`
       + ` → lib/ratings.mjs tiene k ${MU_SHRINK[sport]}, σ ${SIGMA[sport]}, σ_T ${SIGMA_T[sport]}`);
-    const grid = GRID[sport];
-    if (grid && (f.sigma === grid[0] || f.sigma === grid.at(-1) || Math.abs(f.sigma - f.residualSd) > 0.15 * f.residualSd)) {
+    if (f.sigma === SIGMAS[0] || f.sigma === SIGMAS.at(-1) || Math.abs(f.sigma - f.residualSd) > 0.15 * f.residualSd) {
       console.warn(`${sport}: σ en el borde de la grilla o lejos del desvío real: revisar el modelo de mu antes de publicar`);
     }
   }

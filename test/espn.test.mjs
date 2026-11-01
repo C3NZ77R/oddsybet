@@ -41,25 +41,25 @@ test('scoreboard de fútbol: marcador en vivo y sin cuotas de casas', () => {
   assert.ok(!('odds' in live) && !('odds' in pre));
 });
 
-test('summary NFL + core API → GameDetail', () => {
-  const d = e.normSummary(fx('summary-nfl.json'), 'nfl', { records: { home: fx('core-record-nfl.json') }, stats: { home: fx('core-stats-nfl.json') } });
-  assert.equal(d.id, '401872999');
-  assert.deepEqual([d.home.abbr, d.away.abbr], ['ATL', 'CHI']);
+test('summary NBA + core API → GameDetail', () => {
+  const d = e.normSummary(fx('summary-nba.json'), 'nba', { records: { home: fx('core-record-nba.json') }, stats: { home: fx('core-stats-nba.json') } });
+  assert.equal(d.id, '401909903');
+  assert.deepEqual([d.home.abbr, d.away.abbr], ['ORL', 'BOS']);
   assert.equal('odds' in d, false); // ni pickcenter ni odds del summary
-  assert.deepEqual(d.records.home.map((r) => `${r.key}:${r.summary}`), ['overall:2-3', 'home:0-2', 'road:2-1', 'vsdiv:1-1', 'vsconf:2-1']);
+  assert.deepEqual(d.records.home.map((r) => `${r.key}:${r.summary}`), ['overall:2-3', 'home:0-2', 'road:2-1', 'vsdiv:0-1', 'vsconf:2-2', 'lasttengames:2-3']);
   assert.equal(d.records.away[0].key, 'overall'); // respaldo: récords del header del summary
-  const pts = d.teamStats.home.find((s) => s.key === 'totalPointsPerGame');
-  assert.deepEqual(pts, { key: 'totalPointsPerGame', label: 'Puntos por partido', value: 23.8, display: '23.8', rank: 13 });
+  const pts = d.teamStats.home.find((s) => s.key === 'avgPoints');
+  assert.deepEqual(pts, { key: 'avgPoints', label: 'Puntos por partido', value: 114.85366, display: '114.9', rank: 3 });
   assert.ok(d.teamStats.away.length > 0, 'respaldo con las estadísticas del boxscore');
   assert.equal(d.teamStatsSeason, 2026);
   assert.equal(d.injuries.length, 4);
   assert.deepEqual(Object.keys(d.injuries[0]).sort(), ['athlete', 'comment', 'date', 'detail', 'returnDate', 'status', 'teamAbbr', 'teamId']);
-  assert.equal(d.injuries[0].athlete.id, '3043168');
-  assert.equal(d.injuries[0].status, 'Questionable');
+  assert.equal(d.injuries[0].athlete.id, '4065654');
+  assert.equal(d.injuries[0].status, 'Out');
   const l5 = d.lastFive.home;
   assert.ok(l5.length === 3 && l5[0].date > l5[2].date, 'del más reciente al más antiguo');
-  assert.deepEqual({ opp: l5[0].opp.abbr, home: l5[0].home, score: l5[0].score, result: l5[0].result }, { opp: 'GB', home: false, score: '35-14', result: 'W' });
-  assert.deepEqual(d.predictor, { homeWinPct: 0.337, awayWinPct: 0.661 });
+  assert.deepEqual({ opp: l5[0].opp.abbr, home: l5[0].home, score: l5[0].score, result: l5[0].result }, { opp: 'NY', home: false, score: '111-102', result: 'W' });
+  assert.deepEqual(d.predictor, { homeWinPct: 0.36, awayWinPct: 0.64 });
   assert.equal(d.ats, null);
   assert.equal(d.starters, null);
   assert.equal(d.publicBetting, null);
@@ -104,12 +104,7 @@ test('game log NBA: claves cortas, derivadas y contexto del partido', () => {
   assert.ok(games.every((x, i) => i === 0 || games[i - 1].date >= x.date));
 });
 
-test('game logs de otros deportes', () => {
-  const qb = e.normGamelog(fx('gamelog-nfl-qb.json'), 'football')[0].stats;
-  assert.deepEqual([qb.pass_yds, qb.pass_int, qb.sacked, qb.sacks], [138, 1, 3, undefined]);
-  assert.equal(qb.pass_rush_yds, 180);
-  const p = e.normGamelog(fx('gamelog-mlb-pitcher.json'), 'baseball')[0].stats;
-  assert.deepEqual([p.outs, p.k, p.ha, p.er, p.hits], [15, 7, 5, 2, undefined]);
+test('game log de fútbol', () => {
   const soc = e.normGamelog(fx('gamelog-soccer.json'), 'soccer')[0];
   assert.deepEqual([soc.stats.shots, soc.stats.sot, soc.result, soc.minutes], [3, 2, 'W', null]);
 });
@@ -133,11 +128,9 @@ test('buildGameLog: une temporadas sin duplicar y solo lista estadísticas calcu
 });
 
 test('plantillas, lesiones, búsqueda y perfil', () => {
-  const nfl = e.normRoster(fx('roster-nfl.json'));
-  assert.equal(nfl.length, 10); // grupos offense/defense/... aplanados
-  assert.deepEqual(Object.keys(nfl[0]).sort(), ['headshot', 'id', 'jersey', 'name', 'pos', 'short', 'teamAbbr', 'teamId']);
-  assert.ok(nfl.every((a) => a.teamAbbr === 'ATL'));
-  assert.equal(e.normRoster(fx('roster-nba.json')).length, 3);
+  const nba = e.normRoster(fx('roster-nba.json'));
+  assert.equal(nba.length, 3);
+  assert.deepEqual(Object.keys(nba[0]).sort(), ['headshot', 'id', 'jersey', 'name', 'pos', 'short', 'teamAbbr', 'teamId']);
   const inj = e.normInjuries(fx('injuries-nba.json').injuries);
   assert.equal(inj[0].athlete.id, '5105571'); // la liga no trae id: se saca del enlace del jugador
   assert.equal(inj[0].teamAbbr, 'ATL');
@@ -152,24 +145,20 @@ test('stats.js: derivadas, mercados y alternativos', () => {
   assert.equal(statOf('basketball', 'pra', { reb: 5 }), null);
   assert.equal(statOf('basketball', 'dd', { pts: 12, reb: 10, ast: 3, stl: 0, blk: 0 }), 1);
   assert.equal(statOf('basketball', 'td', { pts: 12, reb: 10, ast: 9 }), 0);
-  assert.equal(statOf('baseball', 'tb', { hits: 2, '2b': 1, hr: 1 }), 6); // un doble (2) + un jonrón (4)
-  assert.equal(statOf('football', 'rush_rec_yds', { rec_yds: 40 }), null); // sin acarreos no es un corredor
-  assert.equal(statOf('football', 'rush_rec_yds', { rush_yds: 50, rec_yds: 40 }), 90);
   assert.equal(statOf('soccer', 'goals', null), null);
   assert.equal(statForMarket('basketball', 'player_points_alternate').key, 'pts');
   assert.equal(statForMarket('soccer', 'player_goal_scorer_anytime').key, 'goals');
-  assert.equal(statForMarket('baseball', 'pitcher_strikeouts').key, 'k');
   assert.equal(statForMarket('basketball', 'player_first_basket'), null);
 });
 
 test('getEvent: el Game del summary, sin pedir plantillas, récords ni estadísticas', async () => {
   const real = globalThis.fetch;
   const urls = [];
-  globalThis.fetch = async (url) => (urls.push(url), new Response(JSON.stringify(url.endsWith('=1') ? fx('summary-nfl.json') : {})));
+  globalThis.fetch = async (url) => (urls.push(url), new Response(JSON.stringify(url.endsWith('=1') ? fx('summary-nba.json') : {})));
   try {
-    const { id, league, start, status, home, away, neutral } = e.normSummary(fx('summary-nfl.json'), 'nfl');
-    assert.deepEqual(await e.getEvent('nfl', '1'), { id, league, start, status, home, away, neutral });
-    assert.deepEqual(urls, ['https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=1']);
-    await assert.rejects(e.getEvent('nfl', '2'), { status: 404 });
+    const { id, league, start, status, home, away, neutral } = e.normSummary(fx('summary-nba.json'), 'nba');
+    assert.deepEqual(await e.getEvent('nba', '1'), { id, league, start, status, home, away, neutral });
+    assert.deepEqual(urls, ['https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary?event=1']);
+    await assert.rejects(e.getEvent('nba', '2'), { status: 404 });
   } finally { globalThis.fetch = real; }
 });

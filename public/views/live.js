@@ -8,7 +8,7 @@ import { propSignals, totalSignal, mainTotal, parseOdds, liveOver, windowLeft, i
 const REFRESH_MS = 15_000;
 const TYPING_MS = 5_000; // sin repintar mientras escribe (iOS cierra el teclado al reemplazar el input)
 const SIDE = { Over: 'Más de', Under: 'Menos de' };
-const UNIT = { football: 'puntos', basketball: 'puntos', soccer: 'goles', baseball: 'carreras' };
+const UNIT = { basketball: 'puntos', soccer: 'goles' };
 const r1 = (x) => Math.round(x * 10) / 10;
 const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const toNum = (v) => (String(v ?? '').trim() === '' ? NaN : Number(String(v).replace(',', '.')));
@@ -109,7 +109,7 @@ export default {
       }).sort(([a, , sa], [b, , sb]) => !!stopOn(b) - !!stopOn(a) || (sb[0]?.level ?? 0) - (sa[0]?.level ?? 0)); // en pausa, arriba
       el.innerHTML = h`<header class="view-head"><div><h1>En vivo · ${lg.title}</h1>
         <p class="hint">Oddsy mira cada partido en juego y avisa cuando un jugador o el marcador van a un ritmo distinto al esperado. Escribe la línea en vivo de tu casa y te decimos qué tan probable es y si la cuota vale la pena. Los partidos en medio tiempo van arriba: es buen momento para apostar. No son picks: tú decides.</p>
-        <p class="hint"><small>Datos de ESPN; se actualiza cada 15 s. ESPN publica cada jugada con unos minutos de atraso (unos 6 en la NFL), así que tu casa va más adelante: revisa el marcador y el precio antes de apostar.</small></p></div></header>
+        <p class="hint"><small>Datos de ESPN; se actualiza cada 15 s. ESPN publica cada jugada con unos minutos de atraso (unos 6), así que tu casa va más adelante: revisa el marcador y el precio antes de apostar.</small></p></div></header>
         ${err ? errorBox(err) : rows.length ? rows.map(([g, x, s]) => gameCard(g, x, s, lg.sport, inputs))
           : h`${empty(`No hay partidos de ${lg.title} en juego ahora.`)}<p><a class="btn" href="#/${lg.id}/games">Ver los próximos partidos</a></p>`}`;
       const input = typing?.sig && el.querySelector(`[data-sig="${CSS.escape(typing.sig)}"] [name="${typing.name}"]`);

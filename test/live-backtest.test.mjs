@@ -16,9 +16,9 @@ test('cutTotals: puntos acumulados al final de cada cuarto; null si los linescor
 });
 
 test('overAt: la misma P(Más) que muestra totalSignal con PRIOR.total', () => {
-  const live = { id: 'g', progress: 0.5, home: { score: 21 }, away: { score: 21 } };
-  const s = totalSignal(live, 44.5, 'football');
-  near(overAt('football', { current: 42, f: 0.5, line: 44.5 }, 8), s.pOver); // 8 = PRIOR.total de public/live.js
+  const live = { id: 'g', progress: 0.5, home: { score: 65 }, away: { score: 65 } };
+  const s = totalSignal(live, 224.5, 'basketball');
+  near(overAt('basketball', { current: 130, f: 0.5, line: 224.5 }, 8), s.pOver); // 8 = PRIOR.total de public/live.js
 });
 
 test('calibration: Brier, log-loss (p = 1 que falla no da Infinity) y tramos de 10 en 10', () => {
@@ -30,22 +30,22 @@ test('calibration: Brier, log-loss (p = 1 que falla no da Infinity) y tramos de 
 });
 
 test('levels: cuenta señales por nivel y si acierta su lado', () => {
-  // NFL a la mitad con línea 44.5: se esperan 22.25 con desvío √(13.2² · 0.5) ≈ 9.33.
-  const rows = [{ current: 42, f: 0.5, line: 44.5, won: true }, { current: 22, f: 0.5, line: 44.5, won: false }, { current: 10, f: 0.5, line: 44.5, won: true }];
-  assert.deepEqual(levels('football', rows), [
+  // NBA a la mitad con línea 224.5: se esperan 112.25 con desvío √(19.2² · 0.5) ≈ 13.58.
+  const rows = [{ current: 140, f: 0.5, line: 224.5, won: true }, { current: 112, f: 0.5, line: 224.5, won: false }, { current: 95, f: 0.5, line: 224.5, won: true }];
+  assert.deepEqual(levels('basketball', rows), [
     { level: 1, n: 1, hit: 0, share: 1 / 3 }, // z ≈ −1.3 → Menos, pero terminó en Más
     { level: 2, n: 0, hit: null, share: 0 },
-    { level: 3, n: 1, hit: 1, share: 1 / 3 }, // z ≈ 2.1 → Más, acertó
+    { level: 3, n: 1, hit: 1, share: 1 / 3 }, // z ≈ 2.0 → Más, acertó
   ]);
 });
 
 test('paired: diferencia de log-loss por corte con el error entre partidos', () => {
-  const rows = ['a', 'b'].flatMap((game, i) => [0.25, 0.5, 0.75].map((f) => ({ game, f, current: Math.round(f * (40 + 20 * i)), line: 44.5, won: i === 1 })));
-  const loss = (r, prior) => -Math.log(r.won ? overAt('football', r, prior) : 1 - overAt('football', r, prior));
+  const rows = ['a', 'b'].flatMap((game, i) => [0.25, 0.5, 0.75].map((f) => ({ game, f, current: Math.round(f * (200 + 50 * i)), line: 224.5, won: i === 1 })));
+  const loss = (r, prior) => -Math.log(r.won ? overAt('basketball', r, prior) : 1 - overAt('basketball', r, prior));
   const d = ['a', 'b'].map((g) => rows.filter((r) => r.game === g).reduce((s, r) => s + loss(r, 1) - loss(r, 8), 0) / 3);
   const m = (d[0] + d[1]) / 2;
-  const p = paired('football', rows, 1, 8);
+  const p = paired('basketball', rows, 1, 8);
   near(p.diff, m);
   near(p.se, Math.sqrt(((d[0] - m) ** 2 + (d[1] - m) ** 2) / 2));
-  near(paired('football', rows, 8, 1).diff, -m);
+  near(paired('basketball', rows, 8, 1).diff, -m);
 });

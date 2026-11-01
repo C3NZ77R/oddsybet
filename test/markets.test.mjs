@@ -15,11 +15,10 @@ const pick = (ms, key, line) => ms.find((m) => m.key === key && (line === undefi
 const sel = (m, name) => m.selections.find((s) => s.name === name);
 
 const SOCCER = { kind: 'poisson', lh: 1.4, la: 1.1 };
-const BASEBALL = { kind: 'poisson', lh: 4.6, la: 4.1 };
 const NBA = { kind: 'normal', mu: 5.2, sigma: 12, total: 226.3, sigmaT: 13.2 };
 const BO3 = { kind: 'tennis', dist: matchDist(0.67, 0.62, 3) };
 const BO5 = { kind: 'tennis', dist: matchDist(0.67, 0.62, 5, { slam: true }) };
-const CASES = [['soccer', SOCCER], ['baseball', BASEBALL], ['basketball', NBA], ['football', { ...NBA, sigma: 13.5 }], ['tennis', BO3], ['tennis', BO5]];
+const CASES = [['soccer', SOCCER], ['basketball', NBA], ['tennis', BO3], ['tennis', BO5]];
 
 test('markets: 1x2 suma 1', () => {
   close(sumP(pick(marketsFor('soccer', SOCCER), '1x2')), 1);
@@ -87,30 +86,6 @@ test('markets: marcador exacto = los 10 más probables en orden, más "Otro"', (
   assert.equal(cs.selections[0].name, '1-1');
   close(cs.selections[0].p, g[1][1]);
   close(top.at(-1), g.flat().sort((a, b) => b - a)[9]);
-});
-
-test('markets: béisbol sin empate; el empate se reparte según lh/(lh+la)', () => {
-  const ms = marketsFor('baseball', BASEBALL);
-  assert.deepEqual([...new Set(ms.map((m) => m.key))], ['ml', 'rl', 'ou']);
-  const ml = pick(ms, 'ml');
-  assert.deepEqual(ml.selections.map((s) => s.name), ['Local', 'Visitante']);
-  assert.ok(!ml.selections.some((s) => s.name === 'Empate'));
-  const g = scoreGrid(BASEBALL.lh, BASEBALL.la, { rho: 0, max: 20 });
-  const P = (f) => g.reduce((s, row, i) => s + row.reduce((t, v, j) => (f(i, j) ? t + v : t), 0), 0);
-  close(sel(ml, 'Local').p, P((i, j) => i > j) + P((i, j) => i === j) * (4.6 / 8.7));
-  // El favorito (local) lleva −1.5: gana por 2 o más.
-  const rl = pick(ms, 'rl');
-  assert.equal(sel(rl, 'Local').line, -1.5);
-  close(sel(rl, 'Local').p, P((i, j) => i - j >= 2));
-});
-
-test('markets: run line con visitante favorito y total de carreras sin gol extra', () => {
-  const ms = marketsFor('baseball', { kind: 'poisson', lh: 3.9, la: 4.8 });
-  assert.equal(pick(ms, 'rl').label, 'Hándicap de carreras');
-  assert.equal(sel(pick(ms, 'rl'), 'Visitante').line, -1.5);
-  assert.equal(sel(pick(ms, 'rl'), 'Local').line, 1.5);
-  const g = scoreGrid(3.9, 4.8, { rho: 0, max: 20 });
-  close(sel(pick(ms, 'ou'), 'Más').p, g.reduce((s, row, i) => s + row.reduce((t, v, j) => (i + j > 8.5 ? t + v : t), 0), 0));
 });
 
 test('markets: normal con mu = 0 y línea 0 da ml 0.5', () => {

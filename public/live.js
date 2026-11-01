@@ -6,8 +6,8 @@ import { statOf } from './stats.js';
 const clamp01 = (x) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
 
 // Fracción jugada del tiempo reglamentario (0..1). period/clock como los da ESPN: en fútbol clock son los segundos
-// jugados; en NFL/NBA/WNBA, los que quedan del periodo; en béisbol cuenta medias entradas por el detalle ("Top 5th").
-const PERIODS = { football: [4, 900], basketball: [4, 720], wnba: [4, 600] };
+// jugados; en NBA/WNBA, los que quedan del periodo.
+const PERIODS = { basketball: [4, 720], wnba: [4, 600] };
 // Segundos del reloj de ESPN: el summary solo trae displayClock ("12:34", "45.2", "67'" en fútbol).
 export function clockSecs(display) {
   const s = String(display ?? '').trim(), m = /^(\d+):(\d\d)/.exec(s);
@@ -15,20 +15,15 @@ export function clockSecs(display) {
   if (/^\d+'/.test(s)) return parseInt(s, 10) * 60;
   return /^\d+(\.\d+)?$/.test(s) ? Number(s) : null;
 }
-export function progress(sport, league, { period, clock, detail } = {}) {
+export function progress(sport, league, { period, clock } = {}) {
   if (sport === 'soccer') return clamp01(clock / 5400);
-  if (sport === 'baseball') {
-    const half = { Top: 0, Mid: 1, Bot: 1, End: 2 }[/^(Top|Mid|Bot|End)/.exec(detail ?? '')?.[1]] ?? 0;
-    return clamp01(((period - 1) * 2 + half) / 18);
-  }
-  const [n, len] = PERIODS[league] ?? PERIODS[sport] ?? PERIODS.football;
+  const [n, len] = PERIODS[league] ?? PERIODS[sport] ?? PERIODS.basketball;
   return clamp01(((period - 1) * len + (len - clock)) / (n * len));
 }
 
-// Cuántos partidos vale el promedio previo frente al ritmo de hoy. Marcador 8: scripts/live-backtest.mjs (NFL 2025, NBA
-// 2025-26) da el menor log-loss con 8 en la NFL, donde el ritmo del marcador casi no informa, y en la NBA de 2 a 8 empatan.
-// Jugador 5: scripts/live-props-backtest.mjs (puntos, rebotes y asistencias de la NBA 2025-26, con playerShare) le gana a
-// 1 por 9 errores estándar; de 3 a 20 empatan. shortcut: medido solo en la NBA (las jugadas de la NFL no traen atletas).
+// Cuántos partidos vale el promedio previo frente al ritmo de hoy. Marcador 8: scripts/live-backtest.mjs (NBA 2025-26)
+// da de 2 a 8 empatados. Jugador 5: scripts/live-props-backtest.mjs (puntos, rebotes y asistencias de la NBA 2025-26, con
+// playerShare) le gana a 1 por 9 errores estándar; de 3 a 20 empatan. shortcut: medido solo en la NBA.
 const PRIOR = { player: 5, total: 8 };
 
 // Lo que falta: el ritmo mezcla lo esperado antes del partido (mean) con lo que lleva (current) en la fracción jugada.
@@ -59,14 +54,8 @@ export function strength(z, support = 0) {
 }
 
 // Contexto que empuja la estadística de un jugador: s = +1 apoya el lado, −1 lo contradice. null si no aplica.
-const PASSING = new Set(['pass_yds', 'pass_cmp', 'pass_att', 'rec', 'rec_yds']);
-const RUSHING = new Set(['rush_yds', 'rush_att']);
 export function scriptFor(sport, stat, side, { margin, progress: f, fouls = 0 }) {
   const dir = side === 'Over' ? 1 : -1;
-  if (sport === 'football' && f >= 0.5 && Math.abs(margin) >= 8) {
-    if (PASSING.has(stat)) return { s: margin < 0 ? dir : -dir, text: margin < 0 ? 'Su equipo va perdiendo: suele pasar más el balón.' : 'Su equipo va ganando: suele pasar menos y correr más.' };
-    if (RUSHING.has(stat)) return { s: margin > 0 ? dir : -dir, text: margin > 0 ? 'Su equipo va ganando: suele correr más para gastar reloj.' : 'Su equipo va perdiendo: suele correr menos.' };
-  }
   if (sport === 'basketball') {
     if (fouls >= 4) return { s: -dir, text: `Tiene ${fouls} faltas: puede sentarse para no quedar fuera.` };
     if (f >= 0.6 && Math.abs(margin) >= 18) return { s: -dir, text: 'Partido muy definido: los titulares suelen descansar al final.' };
@@ -116,9 +105,9 @@ export function propSignals(props, live, sport) {
 }
 
 // Total del partido contra la línea previa de Oddsy (mercado 'ou'). Desvíos como SIGMA_T de lib/ratings.mjs (el test
-// lo compara); en conteos, varianza = dispersión × media (fútbol ~ Poisson; béisbol, sobredisperso). Por liga antes que
+// lo compara); en conteos, varianza = dispersión × media (fútbol ~ Poisson). Por liga antes que
 // por deporte: la WNBA (16.4, reajustado con la WNBA 2025 en caché) anota menos que la NBA.
-export const TOTAL = { football: { kind: 'normal', sd: 13.2 }, basketball: { kind: 'normal', sd: 19.2 }, wnba: { kind: 'normal', sd: 16.4 }, soccer: { kind: 'count', disp: 1 }, baseball: { kind: 'count', disp: 2 } };
+export const TOTAL = { basketball: { kind: 'normal', sd: 19.2 }, wnba: { kind: 'normal', sd: 16.4 }, soccer: { kind: 'count', disp: 1 } };
 export function totalSignal(live, line, sport) {
   const t = TOTAL[live.league] ?? TOTAL[sport], f = live.progress;
   if (!t || !(line > 0) || f < MIN_F || f > MAX_F) return null;
@@ -138,9 +127,9 @@ export function parseOdds(v) {
 }
 
 // Parte del total que se anota, en promedio, al terminar el 1.º, 2.º y 3.er cuarto, de la temporada anterior a la del
-// backtest. NFL 2024 (272 partidos): el 2.º y el 4.º rinden más por los finales de mitad. NBA 2024-25 (1231): el 4.º rinde
-// ~24 %; en 2025-26 mejora el log-loss por 0.0016 ± 0.0004 (pareado). shortcut: la WNBA usa la de la NBA sin medir.
-const CURVE = { football: [0.19, 0.5, 0.71], basketball: [0.25, 0.5, 0.753] };
+// backtest. NBA 2024-25 (1231 partidos): el 4.º rinde ~24 %; en 2025-26 mejora el log-loss por 0.0016 ± 0.0004
+// (pareado). shortcut: la WNBA usa la de la NBA sin medir.
+const CURVE = { basketball: [0.25, 0.5, 0.753] };
 export function scoringShare(sport, f, curves = CURVE) {
   const c = curves[sport];
   if (!c) return f;
@@ -151,21 +140,19 @@ export function scoringShare(sport, f, curves = CURVE) {
 // Lo mismo para un jugador (puntos, rebotes, asistencias): los de la rotación juegan más al principio de cada mitad y
 // descansan en el 4.º, que les rinde ~22 %. NBA 2025-26 (scripts/live-props-backtest.mjs, 41 121 filas): medida en una
 // mitad de la temporada y probada en la otra, baja el log-loss por 0.0010 ± 0.0005 (pareado). shortcut: sin jugadas de
-// 2024-25 en caché, la curva es de la misma temporada del backtest; la NFL sigue lineal (sus jugadas no traen atletas).
+// 2024-25 en caché, la curva es de la misma temporada del backtest.
 const PLAYER_CURVE = { basketball: [0.268, 0.519, 0.779] };
 export const playerShare = (sport, f) => scoringShare(sport, f, PLAYER_CURVE);
 
 // ---------- pausas: momento para apostar ----------
 // Orden: lo específico antes que "timeout" o "end". Duraciones típicas en segundos (estimación, no reloj oficial).
 const STOPS = [
-  [/two-minute/i, 'twomin', 'Aviso de dos minutos', 120],
   [/official timeout|tv timeout/i, 'tv', 'Pausa comercial', 150],
   [/timeout/i, 'timeout', 'Tiempo muerto', 90],
   [/review|challenge/i, 'review', 'Revisión de jugada', 90],
   [/injury/i, 'injury', 'Atención a un lesionado', 120],
   [/halftime|end (of )?(the )?half/i, 'half', 'Medio tiempo', 900],
   [/end (of )?(the )?(period|quarter|regulation)/i, 'period', 'Fin del periodo', 120],
-  [/end (of )?inning|^mid(dle)?\b|^end \d/i, 'inning', 'Cambio de entrada', 150],
 ];
 export function stopOf(text) {
   const hit = STOPS.find(([rx]) => rx.test(String(text ?? '')));
@@ -177,7 +164,7 @@ export function windowLeft(stop, now = Date.now()) {
   const dur = STOPS.find((s) => s[1] === stop?.kind)?.[3];
   return Number.isFinite(at) && dur ? Math.max(0, Math.round(dur - (now - at) / 1000)) : null;
 }
-// ¿La pausa sigue en el partido real? ESPN publica las jugadas ~6 min tarde (medido en la NFL el 2026-10-18), así que
+// ¿La pausa sigue en el partido real? ESPN publica las jugadas ~6 min tarde (medido el 2026-10-18), así que
 // un tiempo muerto ya terminó cuando llega; el medio tiempo suele seguir. Sin hora: solo el medio tiempo.
 export function isActive(stop, now = Date.now()) {
   const left = windowLeft(stop, now);
