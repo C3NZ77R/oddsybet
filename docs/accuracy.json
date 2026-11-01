@@ -21,7 +21,16 @@
     "k": 0.81,
     "sigma": 12.5,
     "residualSd": 14.04,
-    "sigmaT": 19.2
+    "sigmaT": 19.2,
+    "absences": {
+      "season": 2026,
+      "beta": 0.0939,
+      "players": 442,
+      "n": 616,
+      "brier": 0.1814,
+      "without": 0.1948,
+      "baseline": 0.2475
+    }
   },
   "wnba": {
     "season": 2025,
@@ -130,26 +139,26 @@
   "atp": {
     "season": 2026,
     "n": 3152,
-    "brier": 0.2273,
-    "logloss": 0.645,
+    "brier": 0.2202,
+    "logloss": 0.6303,
     "baseline": {
-      "brier": 0.2953,
-      "logloss": 6.568
+      "brier": 0.2366,
+      "logloss": 0.6653
     },
     "publish": true,
-    "note": "La referencia (gana el mejor rankeado) usa el ranking ATP actual, que ya conoce los resultados de la temporada.",
+    "note": "La referencia es la forma: victorias de cada jugador en las 52 semanas previas, convertidas en probabilidad con lo ajustado en la temporada anterior.",
     "set1": {
       "season": 2026,
       "n": 3220,
-      "logloss": 1.7608,
+      "logloss": 1.7606,
       "rps": 0.0834,
       "brier": {
         "8.5": 0.1727,
-        "9.5": 0.2481,
+        "9.5": 0.248,
         "10.5": 0.2007,
         "12.5": 0.1536
       },
-      "mean": 10.0108,
+      "mean": 10.0113,
       "actual": 9.9317,
       "baseline": {
         "hist": {
@@ -167,15 +176,15 @@
         },
         "fixed": {
           "n": 3220,
-          "logloss": 1.7804,
+          "logloss": 1.7805,
           "rps": 0.0847,
           "brier": {
             "8.5": 0.1771,
-            "9.5": 0.2524,
+            "9.5": 0.2525,
             "10.5": 0.2027,
             "12.5": 0.155
           },
-          "mean": 10.2026,
+          "mean": 10.2115,
           "actual": 9.9317
         }
       },
@@ -724,61 +733,61 @@
         {
           "from": 0,
           "n": 24,
-          "said": 0.0801,
+          "said": 0.0803,
           "hit": 0
         },
         {
           "from": 10,
-          "n": 3055,
+          "n": 3052,
           "said": 0.1729,
-          "hit": 0.1784
+          "hit": 0.1763
         },
         {
           "from": 20,
-          "n": 5461,
-          "said": 0.2491,
-          "hit": 0.2457
+          "n": 5475,
+          "said": 0.249,
+          "hit": 0.2462
         },
         {
           "from": 30,
-          "n": 1401,
-          "said": 0.3365,
-          "hit": 0.3348
+          "n": 1386,
+          "said": 0.3363,
+          "hit": 0.3384
         },
         {
           "from": 40,
-          "n": 2939,
+          "n": 2943,
           "said": 0.4556,
-          "hit": 0.4614
+          "hit": 0.4608
         },
         {
           "from": 50,
-          "n": 2939,
+          "n": 2943,
           "said": 0.5444,
-          "hit": 0.5386
+          "hit": 0.5392
         },
         {
           "from": 60,
-          "n": 1401,
-          "said": 0.6635,
-          "hit": 0.6652
+          "n": 1386,
+          "said": 0.6637,
+          "hit": 0.6616
         },
         {
           "from": 70,
-          "n": 5461,
-          "said": 0.7509,
-          "hit": 0.7543
+          "n": 5475,
+          "said": 0.751,
+          "hit": 0.7538
         },
         {
           "from": 80,
-          "n": 3055,
+          "n": 3052,
           "said": 0.8271,
-          "hit": 0.8216
+          "hit": 0.8237
         },
         {
           "from": 90,
           "n": 24,
-          "said": 0.9199,
+          "said": 0.9197,
           "hit": 1
         }
       ]
@@ -2646,6 +2655,137 @@
                 }
               }
             }
+          }
+        }
+      },
+      "opp": {
+        "season": 2026,
+        "players": 442,
+        "w": 0.75,
+        "k": 40,
+        "stats": [
+          "pts",
+          "reb",
+          "ast",
+          "3pm"
+        ],
+        "calibration": {
+          "games": 661,
+          "n": 34025,
+          "diff": -0.0012,
+          "se": 0.0004
+        },
+        "test": {
+          "games": 662,
+          "n": 34026,
+          "diff": -0.0018,
+          "se": 0.0003
+        }
+      }
+    }
+  },
+  "market": {
+    "nba": {
+      "season": 2026,
+      "games": 246,
+      "provider": "DraftKings",
+      "spread": {
+        "n": 246,
+        "logloss": 0.7395,
+        "book": 0.6919,
+        "vsBook": {
+          "diff": 0.0476,
+          "se": 0.0181
+        },
+        "blendWeight": 0,
+        "roi": {
+          "probable": {
+            "n": 246,
+            "hit": 0.4837,
+            "roi": -0.08
+          },
+          "ev0": {
+            "n": 217,
+            "hit": 0.4793,
+            "roi": -0.0875
+          },
+          "ev5": {
+            "n": 182,
+            "hit": 0.456,
+            "roi": -0.1323
+          }
+        }
+      },
+      "ou": {
+        "n": 245,
+        "logloss": 0.704,
+        "book": 0.6936,
+        "vsBook": {
+          "diff": 0.0104,
+          "se": 0.0131
+        },
+        "blendWeight": 0.3,
+        "roi": {
+          "probable": {
+            "n": 245,
+            "hit": 0.5224,
+            "roi": -0.0014
+          },
+          "ev0": {
+            "n": 197,
+            "hit": 0.5178,
+            "roi": -0.0091
+          },
+          "ev5": {
+            "n": 137,
+            "hit": 0.5255,
+            "roi": 0.0077
+          }
+        }
+      },
+      "ml": {
+        "n": 244,
+        "logloss": 0.6053,
+        "book": 0.5671,
+        "vsBook": {
+          "diff": 0.0383,
+          "se": 0.0119
+        },
+        "blendWeight": 0,
+        "roi": {
+          "probable": {
+            "n": 244,
+            "hit": 0.7049,
+            "roi": 0.0221
+          },
+          "ev0": {
+            "n": 213,
+            "hit": 0.2864,
+            "roi": -0.2394
+          },
+          "ev5": {
+            "n": 172,
+            "hit": 0.2616,
+            "roi": -0.2815
+          }
+        }
+      },
+      "all": {
+        "roi": {
+          "probable": {
+            "n": 735,
+            "hit": 0.5701,
+            "roi": -0.0199
+          },
+          "ev0": {
+            "n": 627,
+            "hit": 0.4258,
+            "roi": -0.1145
+          },
+          "ev5": {
+            "n": 491,
+            "hit": 0.4073,
+            "roi": -0.1455
           }
         }
       }

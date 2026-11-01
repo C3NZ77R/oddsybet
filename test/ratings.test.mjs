@@ -405,3 +405,16 @@ test('getPastSeason: argumentos inválidos son 400 y un calendario caído es un 
     await assert.rejects(getPastSeason('colombia', 2), { status: 502 });
   });
 });
+
+test('bajas: absentValue solo cuenta jugadores de rotación que jugaron hace poco con su equipo', async () => {
+  const { absentValue, gameScore, ABSENCE } = await import('../lib/absences.mjs');
+  const cfg = ABSENCE.nba;
+  const g = (date, minutes, pts = 20) => ({ date, minutes, stats: { pts, reb: 5, ast: 5 } });
+  const played = Array.from({ length: 12 }, (_, i) => g(`2026-01-${String(20 - i).padStart(2, '0')}`, 32));
+  const team = Array.from({ length: 30 }, (_, i) => `2026-01-${String(21 - Math.floor(i / 2)).padStart(2, '0')}`);
+  assert.equal(absentValue(played, team, cfg), gameScore(played[0].stats));
+  assert.equal(absentValue(played.map((x) => ({ ...x, minutes: 12 })), team, cfg), 0); // no es de rotación
+  assert.equal(absentValue(played.slice(0, 3), team, cfg), 0); // menos de 5 partidos
+  const later = Array.from({ length: 25 }, (_, i) => `2026-02-${String(25 - i).padStart(2, '0')}`);
+  assert.equal(absentValue(played, later, cfg), 0); // fuera hace más de 20 partidos del equipo: ya está en los ratings
+});
