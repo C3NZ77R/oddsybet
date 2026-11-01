@@ -194,3 +194,20 @@ test('getLiveGame: summary fresco (15 s) aunque el partido esté terminado; 404 
     await assert.rejects(e.getLiveGame('xx', 'live-1'), { status: 400 });
   } finally { globalThis.fetch = real; Date.now = now; }
 });
+
+test('getLiveGame: no sirve el summary que getEvent dejó 5 min en caché para un partido sin empezar', async () => {
+  const real = globalThis.fetch, now = Date.now;
+  const urls = [];
+  globalThis.fetch = async (url) => (urls.push(url), new Response(JSON.stringify(fx('summary-nba.json'))));
+  let t = 3e12;
+  Date.now = () => t;
+  try {
+    assert.equal((await e.getEvent('nba', 'live-pre-3')).status.state, 'pre'); // summaryOf lo guarda con TTL.board
+    t += 10_000;
+    await e.getLiveGame('nba', 'live-pre-3');
+    assert.equal(urls.length, 1); // todavía no pasan 15 s: sale de la caché
+    t += 6_000;
+    await e.getLiveGame('nba', 'live-pre-3');
+    assert.equal(urls.length, 2); // 16 s: el seguimiento pidió 15 s y la entrada de 5 min no le sirve
+  } finally { globalThis.fetch = real; Date.now = now; }
+});
