@@ -162,3 +162,35 @@ test('getEvent: el Game del summary, sin pedir plantillas, récords ni estadíst
     await assert.rejects(e.getEvent('nba', '2'), { status: 404 });
   } finally { globalThis.fetch = real; }
 });
+
+test('normLive: periodo, reloj en segundos y nombre del estado para el seguimiento', () => {
+  const live = fx('summary-nba-post.json');
+  Object.assign(live.header.competitions[0].status, { period: 4, clock: 123.4, displayClock: '2:03' });
+  const g = e.normLive(live, 'nba');
+  assert.deepEqual([g.period, g.clock], [4, 123.4]);
+  assert.equal(g.status.name, live.header.competitions[0].status.type.name);
+  // Sin el número clock (el summary en vivo solo trae displayClock): sale del texto, igual que para progress.
+  delete live.header.competitions[0].status.clock;
+  assert.equal(e.normLive(live, 'nba').clock, 123);
+  // Partido que no ha empezado: sin periodo ni reloj.
+  const pre = e.normLive(fx('summary-nba.json'), 'nba');
+  assert.deepEqual([pre.period, pre.clock, pre.status.name], [null, null, 'STATUS_SCHEDULED']);
+});
+
+test('getLiveGame: summary fresco (15 s) aunque el partido esté terminado; 404 sin partido', async () => {
+  const real = globalThis.fetch, now = Date.now;
+  const urls = [];
+  globalThis.fetch = async (url) => (urls.push(url), new Response(JSON.stringify(url.endsWith('=live-1') ? fx('summary-nba-post.json') : {})));
+  let t = 2e12;
+  Date.now = () => t;
+  try {
+    assert.equal((await e.getLiveGame('nba', 'live-1')).status.state, 'post'); // con liveTtl este summary se guardaría 5 min
+    await e.getLiveGame('nba', 'live-1');
+    assert.equal(urls.length, 1); // dentro de los 15 s sale de la caché
+    t += 16_000;
+    await e.getLiveGame('nba', 'live-1');
+    assert.equal(urls.length, 2);
+    await assert.rejects(e.getLiveGame('nba', 'live-2'), { status: 404 });
+    await assert.rejects(e.getLiveGame('xx', 'live-1'), { status: 400 });
+  } finally { globalThis.fetch = real; Date.now = now; }
+});

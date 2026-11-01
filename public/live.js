@@ -24,7 +24,7 @@ export function progress(sport, league, { period, clock } = {}) {
 // Cuántos partidos vale el promedio previo frente al ritmo de hoy. Marcador 8: scripts/live-backtest.mjs (NBA 2025-26)
 // da de 2 a 8 empatados. Jugador 5: scripts/live-props-backtest.mjs (puntos, rebotes y asistencias de la NBA 2025-26, con
 // playerShare) le gana a 1 por 9 errores estándar; de 3 a 20 empatan. shortcut: medido solo en la NBA.
-const PRIOR = { player: 5, total: 8 };
+export const PRIOR = { player: 5, total: 8 };
 
 // Lo que falta: el ritmo mezcla lo esperado antes del partido (mean) con lo que lleva (current) en la fracción jugada.
 // La varianza de lo que falta conserva la dispersión del jugador (varianza / media).

@@ -221,3 +221,7 @@ test('normLive: avance, pausa por la última jugada, prob. de ganar y boxscore',
   const half = normLive({ ...json, header: { competitions: [{ ...comp, status: { ...comp.status, type: { name: 'STATUS_HALFTIME', state: 'in' } } }] } }, 'nba');
   assert.equal(half.stop.kind, 'half');
 });
+
+test('PRIOR: pesos del promedio previo exportados para el seguimiento', () => {
+  assert.deepEqual(L.PRIOR, { player: 5, total: 8 });
+});
