@@ -214,17 +214,17 @@ Rutas (todas como en el spec): `GET vapid` → `{ publicKey }`; `POST device` �
 
 Orden (spec, sección "El tick"): `takeLease(55)` (false → `{ bets: 0, … }` sin hacer nada) → `activeBets()` → ids de partido de las selecciones activas con `gameStart` a menos de 10 min o ya pasado → `mapLimit(ids, 6, liveGame)` con `catch` por partido (fallo → se cuenta en `skippedGames` y ese partido no entra al `Map`) → `updateBet` por apuesta → `saveSelections` + `saveBet` (con `settledAt` si ya no está activa) → **después** `push.send` por apuesta con `push` no nulo; `gone` → `deleteDevice`. `releaseLease()` en `finally`.
 
-- [ ] **Step 1: tests que fallan** (db y push falsos):
+- [x] **Step 1: tests que fallan** (db y push falsos):
   - `takeLease` → false: no lee apuestas ni manda nada.
   - Dos apuestas en partidos distintos; `liveGame` lanza para uno → la otra se evalúa y se guarda; las selecciones del partido fallido quedan idénticas; `skippedGames === 1`.
   - El estado se guarda antes del push: un `push.send` que lanza no deja el estado sin guardar, y un segundo tick con el mismo partido no repite el aviso.
   - `push.send` → `{ gone: true }` → `deleteDevice` con ese id y las demás apuestas siguen.
   - Apuesta `perdida` no aparece en `activeBets` (la fake lo respeta) → no hay push.
   - `releaseLease` se llama aunque `activeBets` lance.
-- [ ] **Step 2:** `node --test test/tick.test.mjs` → FAIL.
-- [ ] **Step 3:** implementar y conectar como `runTick` por defecto de `createTrack`.
-- [ ] **Step 4:** `node --test` → PASS.
-- [ ] **Step 5:** commit `Seguimiento: tick cada 30 s con candado y push después de guardar`.
+- [x] **Step 2:** `node --test test/tick.test.mjs` → FAIL.
+- [x] **Step 3:** implementar y conectar como `runTick` por defecto de `createTrack`.
+- [x] **Step 4:** `node --test` → PASS.
+- [x] **Step 5:** commit `Seguimiento: tick cada 30 s con candado y push después de guardar`.
 
 ### Task 9: PWA (manifiesto, service worker, íconos)
 

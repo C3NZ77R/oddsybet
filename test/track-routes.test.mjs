@@ -178,3 +178,10 @@ test('trackFromEnv: null si falta alguna variable', () => {
   assert.ok(trackFromEnv(env));
   assert.equal(trackFromEnv({ ...env, TRACK_TICK_SECRET: '' }), null);
 });
+
+test('POST tick: sin runTick inyectado usa el tick real (aquí sin candado, no hace nada)', async () => {
+  const db = { takeLease: async () => false };
+  const track = createTrack({ db, push: {}, readTicket: null, nba: {}, limits: {}, tickSecret: 's' });
+  const r = await track.handle({ method: 'POST', path: 'tick', headers: { 'x-tick-secret': 's' } });
+  assert.deepEqual(r, { status: 200, body: { bets: 0, pushes: 0, skippedGames: 0 } });
+});
