@@ -48,11 +48,11 @@
 - Produces: `getLiveGame(league: string, id: string) → Promise<LiveGame>`: summary con `fetchJson(url, TTL.live)` **en cualquier estado** (no `liveTtl`), normalizado con `normLive`; 404 si no hay `header.competitions[0]`.
 - Produces: `export const PRIOR = { player: 5, total: 8 }` en `public/live.js` (hoy no se exporta).
 
-- [ ] **Step 1: tests que fallan.** En `test/espn.test.mjs`: `normLive(fixture('summary-nba.json'), 'nba')` trae `period` y `clock` numéricos iguales a los del fixture, y `status.name` igual a `header.competitions[0].status.type.name`. Con fetch simulado, dos llamadas a `getLiveGame('nba', id)` separadas por más de 15 s de reloj simulado (o con la caché limpia) piden el summary dos veces aunque el partido esté `post`. En `test/live.test.mjs`: `assert.deepEqual(PRIOR, { player: 5, total: 8 })`.
-- [ ] **Step 2:** `node --test test/espn.test.mjs test/live.test.mjs` → FAIL.
-- [ ] **Step 3:** implementar. `gameFrom` agrega `name` a `status` (aditivo; ningún consumidor existente se rompe).
-- [ ] **Step 4:** `node --test` → todo PASS.
-- [ ] **Step 5:** commit `En vivo: periodo, reloj y summary fresco por partido para el seguimiento`.
+- [x] **Step 1: tests que fallan.** En `test/espn.test.mjs`: `normLive(fixture('summary-nba.json'), 'nba')` trae `period` y `clock` numéricos iguales a los del fixture, y `status.name` igual a `header.competitions[0].status.type.name`. Con fetch simulado, dos llamadas a `getLiveGame('nba', id)` separadas por más de 15 s de reloj simulado (o con la caché limpia) piden el summary dos veces aunque el partido esté `post`. En `test/live.test.mjs`: `assert.deepEqual(PRIOR, { player: 5, total: 8 })`.
+- [x] **Step 2:** `node --test test/espn.test.mjs test/live.test.mjs` → FAIL.
+- [x] **Step 3:** implementar. `gameFrom` agrega `name` a `status` (aditivo; ningún consumidor existente se rompe).
+- [x] **Step 4:** `node --test` → todo PASS.
+- [x] **Step 5:** commit `En vivo: periodo, reloj y summary fresco por partido para el seguimiento`.
 
 ### Task 2: evaluar una selección (lógica pura)
 
@@ -72,7 +72,7 @@
 
 Reglas (del spec, sección Avisos): Más/Sí → `near` una vez, `won` apenas pasa la línea, `risk` por faltas (`pf >= 4` con `period < 4`, o `pf >= 5`; una vez) y por partido definido (`|margen| >= 18` con `progress >= 0.6`, una vez, solo si no la cumplió); Menos/No → `danger` una vez cuando le falta ≤ `near(line)` para pasarse, `lost` apenas se pasa; total → `quarter` por cuarto cerrado 1–3 (solo el último si ESPN saltó varios), `won`/`lost` apenas se cruza; ml/spread → `quarter` 1–3, `swing` en `period >= 4` con límite `SWING_MS` (el `state.lead` solo se actualiza cuando se avisa; empate en el marcador no cambia nada); final → `won`/`lost`/`push`/`void`. "Le falta" para pasar = `Math.floor(line) + 1 - current`. Doble-doble cerca: una categoría (pts/reb/ast) ≥ 10 y otra ≥ 8; triple-doble cerca: dos ≥ 10 y la tercera ≥ 8. El texto lleva la probabilidad (`fmt` entero en %) solo si hay `prior` (props: `remaining` con `playerShare`) o es total (`remaining` con `scoringShare`, `mean: line`, `variance: TOTAL.basketball.sd ** 2`, `prior: PRIOR.total`, `kind: 'normal'`); ml usa `game.winProb` (local; visitante `1 - winProb`). Spread sin %. Copia según los ejemplos del spec.
 
-- [ ] **Step 1: tests que fallan** (helper `game({ state, period, clock, home, away, players, winProb, detail, name })` arma un `LiveGame` mínimo; `sel(...)` una `Selection` con `status: 'pendiente', state: {}`):
+- [x] **Step 1: tests que fallan** (helper `game({ state, period, clock, home, away, players, winProb, detail, name })` arma un `LiveGame` mínimo; `sel(...)` una `Selection` con `status: 'pendiente', state: {}`):
   - `near(24.5) === 4`, `near(8.5) === 2`, `near(2.5) === 1`, `near(0.5) === 1`.
   - Más 24.5 pts, lleva 21, period 4 → `alerts[0].kind === 'near'`, `state.near === true`, texto incluye `'21'`; repetir con ese `state` → `alerts.length === 0`.
   - Lleva 25 → `status === 'cumplida'`, un `won`; con `status: 'cumplida'` de entrada y 27 → sin avisos.
@@ -87,10 +87,10 @@ Reglas (del spec, sección Avisos): Más/Sí → `near` una vez, `won` apenas pa
   - ml local, period 4: el local pasa de ganar a perder → `swing`; vuelve a cambiar 60 000 ms después → nada; 180 000 ms después del primero → `swing`.
   - Juego `pre` → `pendiente`; `in` → `en_juego`.
   - Con `prior` el texto de `near` incluye `'%'`; con `prior: null`, no.
-- [ ] **Step 2:** `node --test test/track.test.mjs` → FAIL.
-- [ ] **Step 3:** implementar `near`, `SWING_MS`, `quartersDone`, `evaluateSelection` en `lib/track.mjs`.
-- [ ] **Step 4:** `node --test` → PASS.
-- [ ] **Step 5:** commit `Seguimiento: evaluación pura de cada selección de NBA`.
+- [x] **Step 2:** `node --test test/track.test.mjs` → FAIL.
+- [x] **Step 3:** implementar `near`, `SWING_MS`, `quartersDone`, `evaluateSelection` en `lib/track.mjs`.
+- [x] **Step 4:** `node --test` → PASS.
+- [x] **Step 5:** commit `Seguimiento: evaluación pura de cada selección de NBA`.
 
 ### Task 3: estado de la apuesta y el push combinado
 
