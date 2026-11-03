@@ -211,13 +211,21 @@ async function send(method, path) {
   return { status, body, headers };
 }
 
+// Vercel corre este test en el build con las variables de producción puestas: hay que quitarlas para probar "sin configurar".
+const TRACK_ENV = ['GEMINI_API_KEY', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'TRACK_TICK_SECRET'];
 test('server: /api/track sin configurar → 503 no-store; el resto de /api sigue solo con GET', async () => {
+  const saved = Object.fromEntries(TRACK_ENV.map((k) => [k, process.env[k]]));
+  for (const k of TRACK_ENV) delete process.env[k];
+  try { await checkUnconfigured(); } finally { for (const [k, v] of Object.entries(saved)) if (v !== undefined) process.env[k] = v; }
+});
+
+async function checkUnconfigured() {
   const r = await send('POST', '/api/track/read');
   assert.equal(r.status, 503);
   assert.equal(r.headers['cache-control'], 'no-store');
   assert.equal(r.body.error, 'El seguimiento de apuestas no está configurado');
   assert.equal((await send('POST', '/api/markets?league=nba')).status, 405);
-});
+}
 
 test('server: readBody acepta JSON hasta 3 MB y usa el cuerpo que ya parseó Vercel', async () => {
   const stream = (chunks, type = 'application/json') => Object.assign(Readable.from(chunks), { method: 'POST', headers: { 'content-type': type } });
