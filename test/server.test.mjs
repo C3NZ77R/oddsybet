@@ -236,3 +236,10 @@ test('server: readBody acepta JSON hasta 3 MB y usa el cuerpo que ya parseó Ver
   assert.deepEqual(await readBody({ method: 'POST', body: { image: 'QUJD' } }), { image: 'QUJD' });
   assert.equal(await readBody({ method: 'GET' }), null);
 });
+
+test('Vercel: cada carpeta anidada de api/ reexporta el handler (el catch-all de la raíz no las atrapa)', async () => {
+  for (const dir of ['tennis', 'track']) {
+    const mod = await import(`../api/${dir}/[...path].mjs`);
+    assert.equal(mod.default, handler, dir);
+  }
+});
