@@ -1,4 +1,8 @@
 // Service worker de Oddsy: solo los avisos de las apuestas seguidas. Sin caché offline ni manejo de fetch.
+self.addEventListener('install', () => self.skipWaiting());
+// Sin claim(), la página que activó los avisos no queda controlada hasta recargar y navigate() del clic falla.
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
 self.addEventListener('push', (event) => {
   let msg = {};
   try {

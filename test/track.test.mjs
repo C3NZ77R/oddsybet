@@ -104,7 +104,7 @@ test('doble-doble: cerca con 10 y 8, cumplido con dos en 10', () => {
 });
 
 test('total: un resumen por cuarto cerrado, solo el último si ESPN saltó varios', () => {
-  const q1 = evaluateSelection(total(), game({ period: 2, clock: 720, home: 55, away: 50 }), 0);
+  const q1 = evaluateSelection(total({ state: { q: 0 } }), game({ period: 2, clock: 720, home: 55, away: 50 }), 0);
   assert.deepEqual(kinds(q1), ['quarter']);
   assert.equal(q1.state.q, 1);
   assert.ok(q1.alerts[0].text.includes('%'));
@@ -201,4 +201,20 @@ test('sencilla cumplida y selección sin partido en el tick', () => {
   const s2 = leg(2, { state: { near: true } });
   const keep = updateBet(bet([leg(1), s2]), games(scored(10)), 0);
   assert.equal(keep.selections[1], s2);
+});
+
+test('primer tick con el partido ya en juego: fija la base y no avisa un cuarto viejo', () => {
+  const mid = game({ period: 4, clock: 372, home: 100, away: 95 });
+  const t = evaluateSelection(total(), mid, 0);
+  assert.deepEqual(kinds(t), []);
+  assert.equal(t.state.q, 3);
+  const w = evaluateSelection(side(), mid, 0);
+  assert.deepEqual(kinds(w), []);
+  assert.equal(w.state.q, 3);
+  assert.equal(w.state.lead, 1);
+  // Antes del salto inicial la base es 0: el resumen del 1.er cuarto sí sale.
+  const pre = evaluateSelection(total(), game({ state: 'pre', period: null, clock: null }), 0);
+  assert.equal(pre.state.q, 0);
+  assert.equal(evaluateSelection(sel(), game({ state: 'pre', period: null, clock: null }), 0).state.q, undefined); // props no la usan
+  assert.deepEqual(kinds(evaluateSelection(total({ state: pre.state }), game({ period: 2, clock: 720, home: 55, away: 50 }), 0)), ['quarter']);
 });

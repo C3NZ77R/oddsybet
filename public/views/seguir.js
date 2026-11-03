@@ -34,7 +34,7 @@ export function payloadOf(rows) {
     const s = { market: r.market, gameId: r.gameId };
     if (r.market === 'prop') Object.assign(s, { stat: r.stat, athleteId: r.athleteId });
     s.side = r.side;
-    if (r.market !== 'ml') s.line = num(r.line);
+    if (r.market !== 'ml') s.line = BINARY.has(r.stat) ? 0.5 : String(r.line ?? '').trim() === '' ? null : num(r.line); // Number('') es 0
     if (r.odds !== '' && r.odds != null) s.odds = r.odds;
     return s;
   });
@@ -85,8 +85,9 @@ export default {
       api.roster('nba', id).then((b) => rosters.set(id, b.data ?? [])).catch(() => rosters.set(id, []))));
     const loadGames = async () => {
       if (games.length) return;
-      const today = new Date(), tomorrow = new Date(Date.now() + 864e5);
-      const lists = await Promise.all([today, tomorrow].map((d) => api.games('nba', ymd(d)).then((b) => b.data ?? []).catch(() => [])));
+      // Ayer, hoy y mañana, como el servidor: de madrugada sigue en juego un partido que empezó ayer.
+      const days = [-1, 0, 1].map((k) => new Date(Date.now() + k * 864e5));
+      const lists = await Promise.all(days.map((d) => api.games('nba', ymd(d)).then((b) => b.data ?? []).catch(() => [])));
       games = [...new Map(lists.flat().filter((g) => g.status?.state !== 'post').map((g) => [g.id, g])).values()];
     };
 

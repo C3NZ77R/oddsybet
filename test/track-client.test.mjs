@@ -44,3 +44,11 @@ test('rowsOf y payloadOf: del borrador leído a lo que se manda al servidor', ()
   const ml = payloadOf([{ ...rowsOf([{ gameId: '401', market: 'ml', side: 'away', line: null, odds: '2,10', tracked: true }])[0] }]);
   assert.deepEqual(ml[0], { market: 'ml', gameId: '401', side: 'away', odds: '2,10' });
 });
+
+test('payloadOf: línea vacía no se manda como 0; Sí/No va con 0.5', () => {
+  const row = (o) => rowsOf([{ gameId: '401', market: 'prop', stat: 'pts', athleteId: '9', side: 'Over', line: null, odds: null, tracked: true, ...o }])[0];
+  assert.equal(payloadOf([row()])[0].line, null);
+  assert.equal(payloadOf([{ ...row(), line: '  ' }])[0].line, null);
+  assert.equal(payloadOf([{ ...row(), line: '0' }])[0].line, 0);
+  assert.equal(payloadOf([{ ...row({ stat: 'dd' }), line: '' }])[0].line, 0.5);
+});

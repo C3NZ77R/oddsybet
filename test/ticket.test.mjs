@@ -90,3 +90,17 @@ test('matchLegs: ganador, hándicap y total', () => {
   assert.equal(tot.tracked, true, tot.reason);
   assert.equal(tot.label, 'Menos de 221.5 puntos en Lakers vs Nuggets');
 });
+
+test('matchLegs: apellidos con Jr. o III y dos partidos entre los mismos equipos', () => {
+  const r2 = new Map([['7', [{ id: 'j1', name: 'Jaren Jackson Jr.', short: 'J. Jackson Jr.', teamId: '7' }]], ['13', []]]);
+  for (const player of ['Jaren Jackson', 'J. Jackson', 'Jaren Jackson Jr.', 'J. Jackson Jr.']) {
+    const d = matchLegs([raw({ player })], [game()], r2)[0];
+    assert.equal(d.athleteId, 'j1', player);
+    assert.equal(d.label, 'Jackson · Más de 24.5 puntos');
+  }
+  const ended = { ...game('post'), id: '300', start: '2026-11-01T02:00:00Z' };
+  const next = { ...game('pre'), id: '402', start: '2026-11-05T02:00:00Z' };
+  const later = { ...game('pre'), id: '403', start: '2026-11-07T02:00:00Z' };
+  assert.equal(matchLegs([raw({ player: 'Jokic' })], [ended, later, next], rosters)[0].gameId, '402'); // el próximo sin terminar
+  assert.equal(matchLegs([raw({ player: 'Jokic' })], [ended], rosters)[0].reason, 'El partido ya terminó'); // solo hay uno y ya terminó
+});

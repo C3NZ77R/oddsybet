@@ -256,6 +256,11 @@ if (!store.get('heroSeen')) {
 $('[data-hero-close]').addEventListener('click', () => { $('#hero').hidden = true; $('#view').focus(); });
 
 window.addEventListener('hashchange', route);
+// Tocar un aviso con Oddsy abierto: el service worker pide llevar la página a Mis apuestas.
+navigator.serviceWorker?.addEventListener('message', (e) => {
+  const hash = e.data?.type === 'open' ? new URL(e.data.url, location.origin).hash : '';
+  if (hash) location.hash = hash;
+});
 syncOddsToggle();
 syncSlip();
 renderSlip();

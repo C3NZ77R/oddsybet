@@ -230,6 +230,7 @@ test('PWA: manifiesto, íconos en disco, enlaces en index.html y service worker 
   assert.match(sw, /addEventListener\('push'/);
   assert.match(sw, /addEventListener\('notificationclick'/);
   assert.doesNotMatch(sw, /addEventListener\('fetch'/); // sin caché offline
+  assert.match(sw, /clients\.claim\(\)/); // navigate() del clic necesita controlar la página abierta
 });
 
 test('PWA: el servidor sirve el manifiesto con su tipo', async () => {
