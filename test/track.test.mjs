@@ -1,7 +1,7 @@
 // Seguimiento de apuestas de NBA: evaluación pura de cada selección contra el partido en vivo (lib/track.mjs). Sin red.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { near, SWING_MS, quartersDone, evaluateSelection } from '../lib/track.mjs';
+import { near, SWING_MS, quartersDone, evaluateSelection, ACTIVE, updateBet } from '../lib/track.mjs';
 import { progress } from '../public/live.js';
 
 // LiveGame mínimo (como normLive): local DEN (id 1), visitante LAL (id 2).
@@ -132,4 +132,73 @@ test('estado según el partido y % solo con prior', () => {
   const withPrior = evaluateSelection(sel({ prior: { mean: 26, variance: 60, kind: 'normal' } }), game({ players: [jokic({ pts: 21 })] }), 0);
   assert.ok(withPrior.alerts[0].text.includes('%'));
   assert.ok(!evaluateSelection(sel(), game({ players: [jokic({ pts: 21 })] }), 0).alerts[0].text.includes('%'));
+});
+
+// ---------- la apuesta completa ----------
+const bet = (selections, o = {}) => ({ id: 'b1', deviceId: 'd1', book: null, odds: null, status: 'en_juego', notified: { start: true }, selections, ...o });
+const games = (...gs) => new Map(gs.map((g, i) => [`g${i + 1}`, { ...g, id: `g${i + 1}` }]));
+const leg = (n, o = {}) => sel({ id: `s${n}`, gameId: `g${n}`, label: `Jugador ${n} · Más de 24.5 puntos`, ...o });
+const scored = (pts, o = {}) => game({ players: [jokic({ pts })], ...o });
+
+test('ACTIVE: los estados que todavía se evalúan', () => {
+  assert.deepEqual([...ACTIVE], ['pendiente', 'en_juego']);
+});
+
+test('combinada: una fallada la tumba y solo se nombra esa', () => {
+  const r = updateBet(bet([leg(1), leg(2), leg(3, { side: 'Under' })]), games(scored(10), scored(10), scored(30)), 0);
+  assert.equal(r.status, 'perdida');
+  assert.equal(r.push.title, 'Se cayó tu combinada');
+  assert.ok(r.push.body.includes('Jugador 3') && r.push.body.includes('Ya no te avisamos de las demás.'));
+  assert.ok(!r.push.body.includes('Jugador 1') && !r.push.body.includes('Jugador 2'));
+  assert.equal(r.push.tag, 'b1');
+  assert.equal(r.push.url, '/#/nba/seguir');
+});
+
+test('combinada ganada: cuota total, o recalculada si hubo anuladas', () => {
+  const won = updateBet(bet([leg(1), leg(2), leg(3)], { odds: 8.4 }), games(scored(30), scored(30), scored(30)), 0);
+  assert.equal(won.status, 'ganada');
+  assert.equal(won.push.title, '¡Ganaste la combinada!');
+  assert.ok(won.push.body.includes('8.40'));
+  const voided = leg(3, { status: 'anulada', current: null });
+  const re = updateBet(bet([leg(1, { odds: 2 }), leg(2, { odds: 1.5 }), voided], { odds: 5 }), games(scored(30), scored(30)), 0);
+  assert.equal(re.status, 'ganada');
+  assert.ok(re.push.body.includes('3.00'));
+  const adj = updateBet(bet([leg(1), leg(2), voided], { odds: 5 }), games(scored(30), scored(30)), 0);
+  assert.ok(adj.push.body.includes('cuota ajustada por tu casa'));
+});
+
+test('varios avisos del mismo tick van en un solo push', () => {
+  const r = updateBet(bet([leg(1), leg(2)]), games(scored(21), scored(22)), 0);
+  assert.equal(r.status, 'en_juego');
+  assert.ok(r.push.body.includes('Jugador 1') && r.push.body.includes('Jugador 2'));
+  assert.ok(r.push.body.includes('0 de 2 cumplidas'));
+  assert.equal(r.push.body.split('\n').length, 3);
+});
+
+test('parcial con no seguidas; anulada si todo se anuló', () => {
+  const p = updateBet(bet([leg(1), leg(2, { status: 'no_seguida' })]), games(scored(30)), 0);
+  assert.equal(p.status, 'parcial');
+  assert.ok(p.push.body.includes('faltan las que no seguimos'));
+  const a = updateBet(bet([leg(1), leg(2)]), games(game({ state: 'post' }), game({ state: 'post' })), 0);
+  assert.equal(a.status, 'anulada');
+  assert.equal(a.notified.final, true);
+});
+
+test('arranque: un solo aviso de "Empezó"', () => {
+  const b = bet([leg(1)], { status: 'pendiente', notified: {} });
+  const first = updateBet(b, games(scored(5, { period: 1, clock: 700 })), 0);
+  assert.equal(first.notified.start, true);
+  assert.ok(first.push.body.includes('Empezó Los Angeles Lakers vs Denver Nuggets: seguimos tu apuesta'));
+  const again = updateBet({ ...b, notified: first.notified, selections: first.selections }, games(scored(6, { period: 1, clock: 650 })), 0);
+  assert.equal(again.push, null);
+  assert.equal(updateBet(b, games(game({ state: 'pre', period: null, clock: null })), 0).status, 'pendiente');
+});
+
+test('sencilla cumplida y selección sin partido en el tick', () => {
+  const r = updateBet(bet([leg(1)]), games(scored(26)), 0);
+  assert.equal(r.status, 'ganada');
+  assert.equal(r.push.title, '¡Cumplida! Jugador 1 · Más de 24.5 puntos');
+  const s2 = leg(2, { state: { near: true } });
+  const keep = updateBet(bet([leg(1), s2]), games(scored(10)), 0);
+  assert.equal(keep.selections[1], s2);
 });

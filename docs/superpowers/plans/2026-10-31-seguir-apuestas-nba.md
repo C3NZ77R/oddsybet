@@ -107,11 +107,11 @@ Reglas (del spec, sección Avisos): Más/Sí → `near` una vez, `won` apenas pa
 
 Reglas: alguna `fallada` → `perdida`, push con título `'Se cayó tu combinada'` (o el `label` si es sencilla) y **solo** la línea de esa selección más `'Ya no te avisamos de las demás.'` en combinadas; todas las seguidas en `cumplida|anulada|devuelta`: sin `no_seguida` → `ganada` (título `'¡Ganaste la combinada!'` con la cuota si `bet.odds`; sencilla: `'¡Cumplida! ' + label`), todas `anulada|devuelta` → `anulada`, con `no_seguida` → `parcial` (cuerpo incluye `'faltan las que no seguimos'`); si no, `en_juego` si algún partido está `in` o `post`, `pendiente` si no. Primer partido `in` y `!notified.start` → línea `'Empezó <visitante> vs <local>: seguimos tu apuesta'` y `notified.start = true`. En combinadas cada push lleva `'<n> de <m> cumplidas'`. Varios avisos del mismo tick → un solo push con las líneas unidas por `'\n'`. Cuota mostrada al ganar: `bet.odds.toFixed(2)`; si hubo selecciones `anulada`/`devuelta`, el producto de las cuotas de las demás cuando todas tienen `odds`, y si no, el texto `'cuota ajustada por tu casa'`.
 
-- [ ] **Step 1: tests que fallan:** combinada de 3 con una `fallada` → `status === 'perdida'`, `push.title === 'Se cayó tu combinada'`, el cuerpo no menciona las otras dos; las tres cumplidas con `odds: 8.4` → `ganada`, título `'¡Ganaste la combinada!'`, cuerpo incluye `'8.40'`; cumplidas 2 (cuotas 2 y 1.5) + 1 anulada → cuerpo incluye `'3.00'`; lo mismo sin cuotas por selección → `'cuota ajustada por tu casa'`; dos selecciones con aviso en el mismo tick → un push con dos líneas; seguidas cumplidas + una `no_seguida` → `parcial`; todas anuladas → `anulada`; arranque → `notified.start === true` y la línea de "Empezó"; segunda llamada → sin línea de "Empezó"; sencilla cumplida → título con el `label`; selección cuyo partido no está en `games` → no cambia.
-- [ ] **Step 2:** `node --test test/track.test.mjs` → FAIL.
-- [ ] **Step 3:** implementar `ACTIVE` y `updateBet`.
-- [ ] **Step 4:** `node --test` → PASS.
-- [ ] **Step 5:** commit `Seguimiento: estado de la apuesta, combinadas y un push por apuesta`.
+- [x] **Step 1: tests que fallan:** combinada de 3 con una `fallada` → `status === 'perdida'`, `push.title === 'Se cayó tu combinada'`, el cuerpo no menciona las otras dos; las tres cumplidas con `odds: 8.4` → `ganada`, título `'¡Ganaste la combinada!'`, cuerpo incluye `'8.40'`; cumplidas 2 (cuotas 2 y 1.5) + 1 anulada → cuerpo incluye `'3.00'`; lo mismo sin cuotas por selección → `'cuota ajustada por tu casa'`; dos selecciones con aviso en el mismo tick → un push con dos líneas; seguidas cumplidas + una `no_seguida` → `parcial`; todas anuladas → `anulada`; arranque → `notified.start === true` y la línea de "Empezó"; segunda llamada → sin línea de "Empezó"; sencilla cumplida → título con el `label`; selección cuyo partido no está en `games` → no cambia.
+- [x] **Step 2:** `node --test test/track.test.mjs` → FAIL.
+- [x] **Step 3:** implementar `ACTIVE` y `updateBet`.
+- [x] **Step 4:** `node --test` → PASS.
+- [x] **Step 5:** commit `Seguimiento: estado de la apuesta, combinadas y un push por apuesta`.
 
 ### Task 4: leer el ticket con Gemini y cruzarlo con ESPN
 
