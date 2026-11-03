@@ -6,12 +6,12 @@ import { LEAGUES, leagueById } from './leagues.js';
 import { parlayOdds } from './betmath.js';
 
 const $ = (s) => document.querySelector(s);
-const LEAGUE_VIEWS = ['props', 'games', 'live', 'picks', 'insights', 'popular'];
+const LEAGUE_VIEWS = ['props', 'games', 'live', 'picks', 'insights', 'popular', 'seguir'];
 const DETAIL_VIEWS = ['props', 'games'];
-const NAMES = { props: 'Props', games: 'Partidos', live: 'En vivo', picks: 'Mejores apuestas', insights: 'Tendencias', popular: 'Populares', 'tennis-rankings': 'Ranking ATP', 'tennis-player': 'Jugador ATP' };
+const NAMES = { props: 'Props', games: 'Partidos', live: 'En vivo', picks: 'Mejores apuestas', insights: 'Tendencias', popular: 'Populares', 'tennis-rankings': 'Ranking ATP', 'tennis-player': 'Jugador ATP', seguir: 'Mis apuestas' };
 const lastLeague = () => leagueById(store.get('league')) ?? LEAGUES[0];
-// El tenis solo tiene Partidos y Mejores apuestas (sin props, insights ni populares).
-const viewsOf = (lg) => (lg.sport === 'tennis' ? ['games', 'picks'] : LEAGUE_VIEWS);
+// El tenis solo tiene Partidos y Mejores apuestas (sin props, insights ni populares). Mis apuestas: solo la NBA.
+const viewsOf = (lg) => (lg.sport === 'tennis' ? ['games', 'picks'] : lg.id === 'nba' ? LEAGUE_VIEWS : LEAGUE_VIEWS.filter((v) => v !== 'seguir'));
 const home = (lg) => `#/${lg.id}/${viewsOf(lg).includes('props') ? 'props' : 'games'}`;
 const defaultHash = () => home(lastLeague());
 

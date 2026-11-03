@@ -255,11 +255,11 @@ Orden (spec, sección "El tick"): `takeLease(55)` (false → `{ bets: 0, … }` 
 
 La vista (`#/nba/seguir`), con el estilo de `public/views/live.js`: (1) estado de avisos según `pushSupport` (instrucciones de iPhone: Compartir → "Agregar a inicio"; permiso negado: cómo activarlo en ajustes; escritorio: "Los avisos son para el celular"), con botón "Activar avisos" solo en `'ok'`; (2) con avisos activos: "Subir pantallazo" (`<input type="file" accept="image/*">`) y "Pegar texto", con el aviso de privacidad de Gemini (texto del spec, sección Experiencia) y la nota del atraso de ESPN; (3) confirmación editable por selección (partido de los de NBA de `api.games`, jugador de la plantilla, mercado, Más/Menos, línea, cuota; las `no_seguida` visibles con su motivo y sin editar), botón "Seguir apuesta"; formulario vacío si la lectura falla o da 429; (4) lista de apuestas con estado en vivo (`GET bets`, refresco cada 15 s con `document.hidden` como en En vivo) y "Dejar de seguir". Escapar todo texto externo con `h`/`esc`.
 
-- [ ] **Step 1: tests que fallan:** `pushSupport({ standalone: false, hasPush: true, ios: true, permission: 'default' }) === 'ios-install'`; `({ standalone: true, hasPush: true, ios: true, permission: 'default' }) === 'ok'`; `permission: 'denied'` → `'denied'`; `hasPush: false` (no iOS) → `'unsupported'`; `b64ToBytes` de una llave VAPID conocida da 65 bytes con primer byte 4.
-- [ ] **Step 2:** correr el test → FAIL.
-- [ ] **Step 3:** implementar cliente, vista, estilos, navegación y `store`.
-- [ ] **Step 4:** `node --test` → PASS. Luego verificar en el navegador con el servidor local (`preview_start`): `#/nba/seguir` carga sin errores de consola, `#/wnba/seguir` redirige, el aviso de iPhone sale con viewport móvil, el formulario manual se puede llenar y se ve bien a 375 px. Captura de pantalla como prueba.
-- [ ] **Step 5:** commit `Seguimiento: vista Mis apuestas en la NBA`.
+- [x] **Step 1: tests que fallan:** `pushSupport({ standalone: false, hasPush: true, ios: true, permission: 'default' }) === 'ios-install'`; `({ standalone: true, hasPush: true, ios: true, permission: 'default' }) === 'ok'`; `permission: 'denied'` → `'denied'`; `hasPush: false` (no iOS) → `'unsupported'`; `b64ToBytes` de una llave VAPID conocida da 65 bytes con primer byte 4.
+- [x] **Step 2:** correr el test → FAIL.
+- [x] **Step 3:** implementar cliente, vista, estilos, navegación y `store`.
+- [x] **Step 4:** `node --test` → PASS. Luego verificar en el navegador con el servidor local (`preview_start`): `#/nba/seguir` carga sin errores de consola, `#/wnba/seguir` redirige, el aviso de iPhone sale con viewport móvil, el formulario manual se puede llenar y se ve bien a 375 px. Captura de pantalla como prueba.
+- [x] **Step 5:** commit `Seguimiento: vista Mis apuestas en la NBA`.
 
 ### Task 11: documentación
 

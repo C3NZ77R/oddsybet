@@ -1,0 +1,35 @@
+/* Mis apuestas (#/nba/seguir) */
+.view-seguir .card { margin-bottom: 12px; }
+.view-seguir h2 { font-size: 17px; margin: 0 0 8px; }
+.sg-steps { margin: 0 0 8px; padding-left: 20px; display: grid; gap: 4px; }
+.sg-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.sg-file { cursor: pointer; position: relative; }
+.sg-file:focus-within { outline: 2px solid var(--teal); outline-offset: 2px; }
+.sg-paste { display: grid; gap: 8px; margin: 8px 0; }
+.sg-paste label, .sg-fields label { display: grid; gap: 4px; font-size: 12px; }
+.sg-paste textarea { width: 100%; }
+.sg-note { color: var(--muted); margin: 8px 0 0; }
+.sg-msg { margin: 8px 0 0; color: var(--warn); }
+.sg-rows { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 10px; }
+.sg-row { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--panel-2); display: grid; gap: 8px; }
+.sg-row p { margin: 0; }
+.sg-row > .btn { justify-self: start; }
+.sg-fixed { opacity: .8; }
+.sg-reason { color: var(--warn); font-size: 13px; }
+.sg-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.sg-fields input, .sg-fields select { width: 100%; min-width: 0; }
+.sg-meta { margin: 8px 0; }
+.btn.sm { padding: 4px 10px; font-size: 13px; }
+.sg-list h2 { margin: 16px 0 8px; }
+.sg-bet-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sg-bet-head h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.sg-bet .hint { margin: 4px 0 8px; }
+.sg-sels { list-style: none; margin: 8px 0 12px; padding: 0; display: grid; gap: 6px; }
+.sg-sels li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 14px; }
+.sg-sels li > span:first-child { flex: 1 1 180px; overflow-wrap: anywhere; }
+.sg-sels small { color: var(--muted); }
+.sg-st { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.sg-en_juego { color: var(--teal); border-color: #1d4d45; }
+.sg-cumplida, .sg-ganada { color: var(--pos); border-color: #1f5a3c; }
+.sg-fallada, .sg-perdida { color: var(--err); border-color: #5a2626; }
+.sg-parcial { color: var(--warn); }

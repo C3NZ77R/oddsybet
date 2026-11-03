@@ -1,5 +1,5 @@
 // Estado del usuario en localStorage (con respaldo en memoria si el navegador lo bloquea).
-// Claves: picks, settings, views, presets, league (última liga), heroSeen.
+// Claves: picks, settings, views, presets, league (última liga), heroSeen, track.
 const PREFIX = 'oddsy.';
 const DEFAULTS = {
   picks: [], // [{ id, label, price (decimal), book, league, gameId, addedAt }]
@@ -7,6 +7,7 @@ const DEFAULTS = {
   views: {}, // { [propKey]: { view, add, last } } → "Populares" con actividad local
   presets: {}, // { [vista]: [{ name, ... }] }
   league: 'nba',
+  track: null, // { deviceId, secret } del seguimiento de apuestas (avisos al celular)
 };
 const MAX_VIEWS = 300;
 const mem = {};
