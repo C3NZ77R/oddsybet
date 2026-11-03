@@ -168,11 +168,11 @@ Cruce: partido = el de `games` cuyos dos equipos coinciden con `teams` (o con el
 **Interfaces:**
 - Produces: `export function isPushEndpoint(url: string) → boolean` (https y host que termina en `fcm.googleapis.com`, `push.apple.com`, `push.services.mozilla.com` o `notify.windows.com`); `export function createPush({ publicKey, privateKey, subject, webpush })` → `{ send(subscription, { title, body, tag, url }) → Promise<{ ok: boolean, gone: boolean }> }` con `webpush.sendNotification(sub, JSON.stringify(payload), { vapidDetails: { subject, publicKey, privateKey }, TTL: 600, urgency: 'high' })`; `statusCode` 404/410 → `{ ok: false, gone: true }`; otro error → `{ ok: false, gone: false }` (registra solo el código, nunca la suscripción).
 
-- [ ] **Step 1: tests que fallan:** `isPushEndpoint('https://fcm.googleapis.com/fcm/send/x') === true`, `'https://web.push.apple.com/abc'` → true, `'http://fcm.googleapis.com/x'` → false, `'https://evil.com/fcm.googleapis.com'` → false; `send` con un `webpush` falso que lanza `{ statusCode: 410 }` → `{ ok: false, gone: true }`; que resuelve → `{ ok: true, gone: false }` y recibió `TTL: 600`.
-- [ ] **Step 2:** `node --test test/push.test.mjs` → FAIL.
-- [ ] **Step 3:** `npm install web-push`; implementar.
-- [ ] **Step 4:** `node --test` → PASS.
-- [ ] **Step 5:** commit `Seguimiento: envío de Web Push (única dependencia: web-push)`.
+- [x] **Step 1: tests que fallan:** `isPushEndpoint('https://fcm.googleapis.com/fcm/send/x') === true`, `'https://web.push.apple.com/abc'` → true, `'http://fcm.googleapis.com/x'` → false, `'https://evil.com/fcm.googleapis.com'` → false; `send` con un `webpush` falso que lanza `{ statusCode: 410 }` → `{ ok: false, gone: true }`; que resuelve → `{ ok: true, gone: false }` y recibió `TTL: 600`.
+- [x] **Step 2:** `node --test test/push.test.mjs` → FAIL.
+- [x] **Step 3:** `npm install web-push`; implementar.
+- [x] **Step 4:** `node --test` → PASS.
+- [x] **Step 5:** commit `Seguimiento: envío de Web Push (única dependencia: web-push)`.
 
 ### Task 7: rutas `/api/track/*` y POST en el servidor
 
