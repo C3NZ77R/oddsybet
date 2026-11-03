@@ -236,11 +236,11 @@ Orden (spec, sección "El tick"): `takeLease(55)` (false → `{ bets: 0, … }` 
 **Interfaces:**
 - Produces: manifiesto `{ name: 'Oddsy Bet', short_name: 'Oddsy', start_url: '/#/nba/seguir', display: 'standalone', background_color, theme_color (los del tema actual), icons: [192, 512 (purpose any y maskable)] }`. `sw.js`: `push` → `showNotification(title, { body, tag, data: { url }, icon: '/icons/icon-192.png' })`; `notificationclick` → enfoca una ventana de Oddsy y navega a `data.url`, o `clients.openWindow(data.url)`. Sin caché offline ni `fetch` handler.
 
-- [ ] **Step 1: tests que fallan:** el manifiesto parsea como JSON con `display === 'standalone'`, `start_url === '/#/nba/seguir'` e íconos de 192 y 512 que existen en disco; `index.html` enlaza el manifiesto y el apple-touch-icon; `sw.js` pasa `node --check`; `GET /manifest.webmanifest` responde `application/manifest+json`.
-- [ ] **Step 2:** `node --test test/ui.test.mjs` → FAIL.
-- [ ] **Step 3:** crear los archivos. Íconos: el logo de `index.html` (rect `#11161f`, arco `#c6f432`) rasterizado con la herramienta que haya (`rsvg-convert`, ImageMagick o un script de Node con `zlib`); fondo lleno para que sirva como maskable.
-- [ ] **Step 4:** `node --test` → PASS.
-- [ ] **Step 5:** commit `PWA: manifiesto, service worker de avisos e íconos`.
+- [x] **Step 1: tests que fallan:** el manifiesto parsea como JSON con `display === 'standalone'`, `start_url === '/#/nba/seguir'` e íconos de 192 y 512 que existen en disco; `index.html` enlaza el manifiesto y el apple-touch-icon; `sw.js` pasa `node --check`; `GET /manifest.webmanifest` responde `application/manifest+json`.
+- [x] **Step 2:** `node --test test/ui.test.mjs` → FAIL.
+- [x] **Step 3:** crear los archivos. Íconos: el logo de `index.html` (rect `#11161f`, arco `#c6f432`) rasterizado con la herramienta que haya (`rsvg-convert`, ImageMagick o un script de Node con `zlib`); fondo lleno para que sirva como maskable.
+- [x] **Step 4:** `node --test` → PASS.
+- [x] **Step 5:** commit `PWA: manifiesto, service worker de avisos e íconos`.
 
 ### Task 10: vista "Mis apuestas"
 

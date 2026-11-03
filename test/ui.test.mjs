@@ -205,3 +205,36 @@ test('picks del día: dayText resume las apuestas más probables para WhatsApp',
   assert.match(t, /Liga BetPlay/);
   assert.ok(t.indexOf('Más de 2.5') < t.indexOf('Gana Millonarios')); // la más probable primero
 });
+
+// ---------- PWA (seguimiento de apuestas: avisos con Oddsy cerrado) ----------
+test('PWA: manifiesto, íconos en disco, enlaces en index.html y service worker válido', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { execFileSync } = await import('node:child_process');
+  const pub = (f) => new URL(`../public/${f}`, import.meta.url);
+  const m = JSON.parse(readFileSync(pub('manifest.webmanifest'), 'utf8'));
+  assert.equal(m.display, 'standalone');
+  assert.equal(m.start_url, '/#/nba/seguir');
+  const size = (src) => { const png = readFileSync(pub(src.replace(/^\//, ''))); return [png.readUInt32BE(16), png.readUInt32BE(20)]; };
+  for (const px of [192, 512]) {
+    const icon = m.icons.find((i) => i.sizes === `${px}x${px}`);
+    assert.ok(icon, `ícono de ${px}`);
+    assert.deepEqual(size(icon.src), [px, px]);
+  }
+  assert.ok(m.icons.some((i) => i.purpose?.includes('maskable')));
+  const html = readFileSync(pub('index.html'), 'utf8');
+  assert.match(html, /<link rel="manifest" href="manifest\.webmanifest"/);
+  assert.match(html, /<link rel="apple-touch-icon" href="icons\/apple-touch-icon\.png"/);
+  assert.deepEqual(size('icons/apple-touch-icon.png'), [180, 180]);
+  execFileSync(process.execPath, ['--check', new URL('../public/sw.js', import.meta.url).pathname]);
+  const sw = readFileSync(pub('sw.js'), 'utf8');
+  assert.match(sw, /addEventListener\('push'/);
+  assert.match(sw, /addEventListener\('notificationclick'/);
+  assert.doesNotMatch(sw, /addEventListener\('fetch'/); // sin caché offline
+});
+
+test('PWA: el servidor sirve el manifiesto con su tipo', async () => {
+  const { handler } = await import('../server.mjs');
+  let headers;
+  await handler({ url: '/manifest.webmanifest', method: 'GET' }, { writeHead(s, h) { headers = h; return this; }, end() {} });
+  assert.equal(headers['content-type'], 'application/manifest+json');
+});
