@@ -9,6 +9,7 @@ import * as espn from './lib/espn.mjs';
 import { getProps } from './lib/props.mjs';
 import { getMarkets, getPicks, getAccuracy, getTennisGames, atpElo } from './lib/markets.mjs';
 import { getRankings, getPlayer } from './lib/tennis.mjs';
+import { trackFromEnv } from './lib/track-routes.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -97,9 +98,45 @@ const json = (res, status, body, edge = 0) => res.writeHead(status, {
   'cache-control': edge ? `public, max-age=0, s-maxage=${edge}, stale-while-revalidate=${edge * 4}` : 'no-store',
 }).end(JSON.stringify(body));
 
+// Seguimiento de apuestas: rutas con POST y cuerpo JSON, siempre no-store. Sin variables de entorno → 503.
+let track;
+const MAX_BODY = 3 * 1024 * 1024;
+export async function readBody(req) {
+  if (req.method !== 'POST') return null;
+  if (req.body !== undefined) { // Vercel ya lo parseó (y su getter lanza si el JSON es inválido)
+    try {
+      const b = req.body;
+      return typeof b === 'string' || Buffer.isBuffer(b) ? JSON.parse(String(b) || 'null') : b;
+    } catch {
+      throw espn.httpError(400, 'JSON inválido');
+    }
+  }
+  if (!String(req.headers?.['content-type'] ?? '').includes('application/json')) throw espn.httpError(415, 'Manda el cuerpo en JSON');
+  let size = 0;
+  const chunks = [];
+  for await (const c of req) {
+    size += c.length;
+    if (size > MAX_BODY) throw espn.httpError(413, 'El archivo es muy pesado');
+    chunks.push(c);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8') || 'null');
+  } catch {
+    throw espn.httpError(400, 'JSON inválido');
+  }
+}
+async function trackRoute(req, res, url) {
+  track ??= trackFromEnv() ?? false;
+  if (!track) throw espn.httpError(503, 'El seguimiento de apuestas no está configurado');
+  const r = await track.handle({ method: req.method, path: url.pathname.slice('/api/track/'.length), query: url.searchParams, headers: req.headers ?? {}, body: await readBody(req) });
+  if (r.status === 204) res.writeHead(204, { 'cache-control': 'no-store' }).end();
+  else json(res, r.status, r.body);
+}
+
 export async function handler(req, res) {
   const url = new URL(req.url, 'http://localhost');
   try {
+    if (url.pathname.startsWith('/api/track/')) return await trackRoute(req, res, url);
     if (url.pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') throw espn.httpError(405, 'Método no permitido');
       const route = ROUTES[url.pathname];

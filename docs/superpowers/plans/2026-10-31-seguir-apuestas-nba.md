@@ -189,17 +189,17 @@ Rutas (todas como en el spec): `GET vapid` → `{ publicKey }`; `POST device` �
 
 `server.mjs`: si `url.pathname.startsWith('/api/track/')`, lee el cuerpo en POST (`content-type` JSON, tope 3 MB → 413 `'El archivo es muy pesado'`; si `req.body` ya viene parseado por Vercel, úsalo), llama `track.handle(...)` y responde `no-store`; `track` = `trackFromEnv()` memorizado; `null` → 503. Lo demás de `/api/` sigue siendo solo GET/HEAD.
 
-- [ ] **Step 1: tests que fallan** (`createTrack` con `db`, `push`, `readTicket`, `nba` falsos en memoria):
+- [x] **Step 1: tests que fallan** (`createTrack` con `db`, `push`, `readTicket`, `nba` falsos en memoria):
   - `POST device` con endpoint `https://evil.com/x` → 400; con endpoint FCM y `push.send` → `{ ok: false }` → 400 y `db` sin dispositivos; con `ok: true` → 200 con `deviceId` y `secret`, y el `secret` no está guardado en claro.
   - `POST read` sin headers → 401; con límite agotado (`bumpReads` → false) → 429; con imagen > 2 MB → 413; correcto → `selections` de `matchLegs` y `readTicket` recibió la imagen.
   - `POST bets`: partido `post` → 400 `'El partido ya terminó'`; partido `in` → 200; partido de WNBA o inexistente → 400; jugador fuera de las plantillas → 400; `nba.props` que tarda más de 20 s → se guarda con `prior: null` (reloj/timeout inyectable).
   - `DELETE bets` de otro dispositivo → 404.
   - `POST tick` sin secreto → 401; con secreto → llama `runTick`.
   - En `test/server.test.mjs`: sin variables de entorno, `POST /api/track/read` → 503 con `cache-control: no-store`; `POST /api/markets` sigue → 405.
-- [ ] **Step 2:** `node --test test/track-routes.test.mjs test/server.test.mjs` → FAIL.
-- [ ] **Step 3:** implementar.
-- [ ] **Step 4:** `node --test` → PASS.
-- [ ] **Step 5:** commit `Seguimiento: rutas /api/track y POST en el servidor`.
+- [x] **Step 2:** `node --test test/track-routes.test.mjs test/server.test.mjs` → FAIL.
+- [x] **Step 3:** implementar.
+- [x] **Step 4:** `node --test` → PASS.
+- [x] **Step 5:** commit `Seguimiento: rutas /api/track y POST en el servidor`.
 
 ### Task 8: el tick
 

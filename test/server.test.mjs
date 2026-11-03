@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { handler } from '../server.mjs';
+import { handler, readBody } from '../server.mjs';
+import { Readable } from 'node:stream';
 import { getSeasonResults } from '../lib/espn.mjs';
 import { ratingsFromResults, expected } from '../lib/ratings.mjs';
 import { marketsFor } from '../lib/markets.mjs';
@@ -200,4 +201,30 @@ test('server: /api/gamelogs no tiene más de 4 pedidos a ESPN en vuelo', async (
     assert.equal((await call('/api/gamelogs?league=nba&ids=11,12,13,14,15,16')).status, 200);
     assert.ok(max <= 4, `${max} en vuelo`);
   } finally { globalThis.fetch = real; }
+});
+
+// ---------- seguimiento de apuestas ----------
+async function send(method, path) {
+  let status, body, headers;
+  const res = { writeHead(s, h) { status = s; headers = h; return this; }, end(b) { body = b ? JSON.parse(b) : null; } };
+  await handler({ url: path, method, headers: { 'content-type': 'application/json' } }, res);
+  return { status, body, headers };
+}
+
+test('server: /api/track sin configurar → 503 no-store; el resto de /api sigue solo con GET', async () => {
+  const r = await send('POST', '/api/track/read');
+  assert.equal(r.status, 503);
+  assert.equal(r.headers['cache-control'], 'no-store');
+  assert.equal(r.body.error, 'El seguimiento de apuestas no está configurado');
+  assert.equal((await send('POST', '/api/markets?league=nba')).status, 405);
+});
+
+test('server: readBody acepta JSON hasta 3 MB y usa el cuerpo que ya parseó Vercel', async () => {
+  const stream = (chunks, type = 'application/json') => Object.assign(Readable.from(chunks), { method: 'POST', headers: { 'content-type': type } });
+  assert.deepEqual(await readBody(stream([Buffer.from('{"text":'), Buffer.from('"hola"}')])), { text: 'hola' });
+  await assert.rejects(readBody(stream([Buffer.alloc(2e6), Buffer.alloc(2e6)])), (e) => e.status === 413);
+  await assert.rejects(readBody(stream(['x'], 'text/plain')), (e) => e.status === 415);
+  await assert.rejects(readBody(stream(['{no'])), (e) => e.status === 400);
+  assert.deepEqual(await readBody({ method: 'POST', body: { image: 'QUJD' } }), { image: 'QUJD' });
+  assert.equal(await readBody({ method: 'GET' }), null);
 });
