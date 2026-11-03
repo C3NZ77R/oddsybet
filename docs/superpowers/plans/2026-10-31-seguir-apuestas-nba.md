@@ -266,9 +266,9 @@ La vista (`#/nba/seguir`), con el estilo de `public/views/live.js`: (1) estado d
 **Files:**
 - Modify: `docs/architecture.md`
 
-- [ ] **Step 1:** documentar en el estilo del archivo: rutas `/api/track/*` con contratos, tablas y funciones de Supabase, variables de entorno (incluye que el proyecto de Google no tenga facturación), el modelo de Gemini con sus límites gratis y la fecha en que se verificaron, el tope global elegido, la regla de dependencias actualizada ("sin dependencias npm salvo `web-push` en el servidor; nada de CDN de JS"), el aviso de privacidad de la capa gratis y la vista `seguir` en la lista de vistas.
-- [ ] **Step 2:** `node --test` → PASS (algunos tests leen la documentación).
-- [ ] **Step 3:** commit `Docs: seguimiento de apuestas`.
+- [x] **Step 1:** documentar en el estilo del archivo: rutas `/api/track/*` con contratos, tablas y funciones de Supabase, variables de entorno (incluye que el proyecto de Google no tenga facturación), el modelo de Gemini con sus límites gratis y la fecha en que se verificaron, el tope global elegido, la regla de dependencias actualizada ("sin dependencias npm salvo `web-push` en el servidor; nada de CDN de JS"), el aviso de privacidad de la capa gratis y la vista `seguir` en la lista de vistas.
+- [x] **Step 2:** `node --test` → PASS (algunos tests leen la documentación).
+- [x] **Step 3:** commit `Docs: seguimiento de apuestas`.
 
 ### Task 12: montaje y salida a producción
 
