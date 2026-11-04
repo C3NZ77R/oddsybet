@@ -3,8 +3,8 @@
 // registro de Oddsy (/api/record): cómo le fue a cada pick del partido (★), guardado antes de empezar y cerrado con ESPN.
 import { h, fmtPct, fmtOdds, when, empty, ymd } from '../ui.js';
 
-// "Local o empate" → "Millonarios o empate"; el tenis ya trae los nombres de los jugadores.
-const named = (text, g) => String(text).replace(/\bLocal\b/g, g.home?.name ?? 'Local').replace(/\bVisitante\b/g, g.away?.name ?? 'Visitante');
+// "Local o visitante" → "Millonarios o Nacional" (en minúscula o mayúscula); el tenis ya trae los nombres de los jugadores.
+const named = (text, g) => String(text).replace(/\blocal\b/gi, g.home?.name ?? 'Local').replace(/\bvisitante\b/gi, g.away?.name ?? 'Visitante');
 const signed = (x) => (x > 0 ? `+${x}` : `${x}`);
 const HCP = { spread: 'hándicap', games_hcp: 'hándicap de games' };
 const pickText = (p, g) => named(HCP[p.market] ? `${p.name} ${signed(p.line)} (${HCP[p.market]})`

@@ -311,3 +311,13 @@ test('registro: si /api/record tarda, los picks salen igual (sin esperarlo más 
   assert.match(String(el.innerHTML), /Gana Millonarios/);
   assert.doesNotMatch(String(el.innerHTML), /Registro de Oddsy/);
 });
+
+test('picks: la doble oportunidad nombra a los dos equipos ("Millonarios o Nacional", no "o visitante")', async () => {
+  const { dayText } = await import('../public/views/picks.js');
+  const g = { home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
+  const t = dayText('Liga BetPlay', [[g, ['Local o visitante', 'Empate o visitante', 'Local o empate'].map((name, i) => ({ market: 'dc', label: 'Doble oportunidad', name, p: 0.8 - i / 10, minOdds: 1.4 }))]]);
+  assert.match(t, /Doble oportunidad: Millonarios o Nacional/);
+  assert.match(t, /Doble oportunidad: Empate o Nacional/);
+  assert.match(t, /Doble oportunidad: Millonarios o empate/);
+  assert.doesNotMatch(t, /visitante/i);
+});
