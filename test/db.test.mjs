@@ -116,3 +116,71 @@ test('migración: tablas, RLS, funciones y purga', () => {
   assert.match(sql, /function track_take_lease\(p_seconds int\)/);
   assert.match(sql, /cron\.schedule\('oddsy-track-purge', '17 9 \* \* \*'/);
 });
+
+// ---------- registro de picks ----------
+test('registro: upsertPicks sobrescribe, insertPicks ignora repetidos, ambos en snake_case', async () => {
+  const { calls, db } = fake(() => undefined);
+  const row = { id: 'nba:401:ml', league: 'nba', gameId: '401', pRaw: 0.7, minOdds: 1.5, x: { fewNow: 1 } };
+  await db.upsertPicks([row]);
+  await db.insertPicks([row]);
+  assert.equal(calls[0].url.pathname, '/rest/v1/pick_log');
+  assert.equal(calls[0].url.searchParams.get('on_conflict'), 'id');
+  assert.equal(calls[0].headers.prefer, 'resolution=merge-duplicates');
+  assert.equal(calls[1].headers.prefer, 'resolution=ignore-duplicates');
+  assert.deepEqual(calls[0].body[0], { id: 'nba:401:ml', league: 'nba', game_id: '401', p_raw: 0.7, min_odds: 1.5, x: { fewNow: 1 } }); // jsonb tal cual
+  await db.upsertPicks([]);
+  assert.equal(calls.length, 2); // sin filas no se pide nada
+});
+
+test('registro: dropMissing borra los pendientes del partido que no siguen', async () => {
+  const { calls, db } = fake(() => undefined);
+  await db.dropMissing('nba', '401', ['nba:401:ml', 'nba:401:ou']);
+  const q = calls[0].url.searchParams;
+  assert.equal(calls[0].method, 'DELETE');
+  assert.equal(q.get('league'), 'eq.nba');
+  assert.equal(q.get('game_id'), 'eq.401');
+  assert.equal(q.get('status'), 'eq.pendiente');
+  assert.equal(q.get('id'), 'not.in.("nba:401:ml","nba:401:ou")');
+  await db.dropMissing('nba', '401', []);
+  assert.equal(calls[1].url.searchParams.get('id'), null); // sin picks nuevos: todos los pendientes del partido
+});
+
+test('registro: rowsSince pagina de a 1 000 hasta una página corta y devuelve camelCase', async () => {
+  const page = (n) => Array.from({ length: n }, (_, i) => ({ id: `r${i}`, p_raw: 0.6, game_start: '2026-10-01T00:00:00Z' }));
+  const { calls, db } = fake((u) => (u.searchParams.get('offset') === '0' ? page(1000) : page(3)));
+  const rows = await db.rowsSince({ since: '2026-07-05T00:00:00.000Z', select: 'p_raw,status', sport: 'soccer', settled: true });
+  assert.equal(rows.length, 1003);
+  assert.equal(rows[0].pRaw, 0.6);
+  assert.deepEqual(calls.map((c) => c.url.searchParams.get('offset')), ['0', '1000']);
+  const q = calls[0].url.searchParams;
+  assert.equal(q.get('game_start'), 'gte.2026-07-05T00:00:00.000Z');
+  assert.equal(q.get('sport'), 'eq.soccer');
+  assert.equal(q.get('status'), 'in.(ganada,perdida)');
+  assert.equal(q.get('select'), 'p_raw,status');
+});
+
+test('registro: modelo y estado del relleno', async () => {
+  const { calls, db } = fake((u) => (u.pathname.endsWith('pick_model') ? [{ model: { version: 1 } }] : u.pathname.endsWith('pick_state') ? [{ backfill: { day: '20261102' } }] : undefined));
+  assert.deepEqual(await db.latestModel(), { version: 1 });
+  assert.deepEqual(await db.getState(), { day: '20261102' });
+  await db.setState({ day: '20261101' });
+  assert.equal(calls[2].method, 'PATCH');
+  assert.deepEqual(calls[2].body, { backfill: { day: '20261101' } });
+  assert.equal(await fake(() => []).db.latestModel(), null);
+});
+
+test('registro: dbFromEnv solo con las dos variables', async () => {
+  const { dbFromEnv } = await import('../lib/db.mjs');
+  assert.equal(dbFromEnv({}), null);
+  assert.equal(dbFromEnv({ SUPABASE_URL: 'https://x.supabase.co' }), null);
+  assert.equal(typeof dbFromEnv({ SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k' }).upsertPicks, 'function');
+});
+
+test('migración del registro: tablas, RLS y purga', () => {
+  const sql = readFileSync(new URL('../supabase/migrations/20261103000000_picklog.sql', import.meta.url), 'utf8');
+  for (const t of ['pick_log', 'pick_model', 'pick_state']) {
+    assert.match(sql, new RegExp(`create table ${t}`));
+    assert.match(sql, new RegExp(`alter table ${t} enable row level security`));
+  }
+  assert.match(sql, /cron\.schedule\('oddsy-picks-purge', '40 9 \* \* \*'/);
+});

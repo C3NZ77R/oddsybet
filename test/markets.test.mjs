@@ -268,6 +268,7 @@ test('mercados: un partido terminado se cotiza con los ratings de antes de jugar
     assert.ok(results.some((r) => r.id === 'g'));
     const p = (opts) => sel(pick(marketsFor('soccer', expected('soccer', ratingsFromResults(results, { sport: 'soccer', ...opts }), '1', '2')), '1x2'), 'Local').p;
     const list = await getMarkets('laliga', { date: '20260411' });
+    assert.deepEqual(list.data[0].x, { few: 0.4, abs: 0 }); // 6 partidos de la temporada antes del corte: 1 − 6/10
     const local = sel(pick(list.data[0].markets, '1x2'), 'Local').p;
     close(local, p({ asOf: Date.parse(g.date) }), 1e-4);
     assert.ok(p({}) - local > 0.01, 'sin su propio 5-1');
@@ -287,6 +288,7 @@ test('mercados: un partido de tenis terminado se cotiza con el Elo de antes de j
     const ml = sel(pick(data.markets, 'ml'), 'A. Zverev').p; // la de matchDist: reproduce p a 1e-4
     close(ml, p(eloFrom(history, { asOf: Date.parse(m.date) })), 1e-4);
     assert.ok(p(eloFrom(history)) - ml > 0.01); // con la final ganada, Zverev subía
+    assert.deepEqual(data.x, { few: 0, abs: 0 }); // los dos con más de 20 partidos en la historia Elo
   },
 ));
 
