@@ -259,3 +259,25 @@ export function propOver(kind, mean, variance, line) {
   }
   return Math.min(0.99, Math.max(0.01, over / (over + under)));
 }
+
+export const MIN_GAMES = 8;
+export const NORMAL = new Set(['pts', 'pra', 'pr', 'pa']); // volúmenes altos: normal; el resto, binomial negativa
+
+// La línea .5 donde Más queda más cerca del 50 %, como la pone Betano (una línea por jugador, 2026-11-04). Con la mediana
+// + 0.5, un jugador de 1 robo quedaba en 1.5 con el Menos al 75 %, y Betano lo tiene en 0.5.
+export function bookLine(kind, mean, variance) {
+  const off = (l) => Math.abs(propOver(kind, mean, variance, l) - 0.5);
+  let line = 0.5;
+  while (propOver(kind, mean, variance, line + 1) >= 0.5) line += 1;
+  return off(line + 1) < off(line) ? line + 1 : line;
+}
+
+// values: del más reciente al más viejo. null con menos de MIN_GAMES partidos. kind 'binary': la media es P(Más 0.5).
+export function propLine(values, kind = 'count') {
+  if (values.length < MIN_GAMES) return null;
+  const avg = (xs) => sum(xs) / xs.length;
+  const m = 0.5 * avg(values.slice(0, 10)) + 0.3 * avg(values) + 0.2 * avg(values.slice(0, 5));
+  const variance = values.reduce((s, x) => s + (x - avg(values)) ** 2, 0) / (values.length - 1);
+  const line = kind === 'binary' ? 0.5 : bookLine(kind, m, variance);
+  return { line, mean: m, variance, pOver: propOver(kind, m, variance, line) };
+}

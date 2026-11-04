@@ -38,8 +38,13 @@ const skel = '<span class="pp-skel" aria-label="Cargando"></span>';
 const inSlip = (store, id) => store.get('picks').some((x) => x.id === id);
 const valsOf = (games, sport, stat) => games.map((g) => S.statOf(sport, stat, g.stats)).filter(Number.isFinite);
 const curSeason = (games) => Math.max(...games.map((g) => g.season).filter(Number.isFinite));
-// Igual que propLine en lib/props.mjs: halfLine(mediana de los últimos 20). vals: del más reciente al más viejo.
-export const medianLine = (vals) => { const med = bm.summarize(vals.slice(0, 20)).median; return med == null ? 0.5 : Math.floor(med) + 0.5; };
+// La misma línea del servidor (bm.propLine); con menos de MIN_GAMES partidos, la mediana de los últimos 20 + 0.5.
+// vals: del más reciente al más viejo.
+export const medianLine = (vals, stat) => {
+  const own = bm.propLine(vals, bm.NORMAL.has(stat) ? 'normal' : 'count')?.line;
+  const med = bm.summarize(vals.slice(0, 20)).median;
+  return own ?? (med == null ? 0.5 : Math.floor(med) + 0.5);
+};
 
 // Clave de propKey (ui.js). El router ya decodifica el segmento; se acepta también la clave sin decodificar.
 export function parsePropKey(key) {
@@ -452,7 +457,7 @@ async function renderDetail(el, ctx) {
     return { ...base, line, side, p: pr.p, fair: pr.fair, books: [{ key: 'oddsy', title: 'Oddsy', price: pr.oddsy }] };
   };
   const lineOf = (stat) => mine.find((p) => p.stat === stat)?.line ?? null;
-  const defaultLine = (stat) => lineOf(stat) ?? (S.STATS[sport]?.find((d) => d.key === stat)?.binary ? 0.5 : medianLine(valsOf(games, sport, stat))); // 0/1 por partido
+  const defaultLine = (stat) => lineOf(stat) ?? (S.STATS[sport]?.find((d) => d.key === stat)?.binary ? 0.5 : medianLine(valsOf(games, sport, stat), stat)); // 0/1 por partido
   const minutesMax = Math.ceil(Math.max(0, ...games.map((g) => g.minutes).filter(Number.isFinite)));
   const s = { stat: k.stat ?? statsHere[0]?.key ?? defs[0]?.key, line: k.line, side: k.side, win: 'l10', loc: 'all', rest: 'all', result: 'all', margin: 20, minMin: 0, mate: '', mateMode: 'with', tab: 'matchup' };
   if (!Number.isFinite(s.line)) s.line = defaultLine(s.stat);

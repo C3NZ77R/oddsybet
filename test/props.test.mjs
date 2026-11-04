@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { propLine, playerProps, getProps, oppEvents, oppTotals, oppFactor, withOpp, OPP } from '../lib/props.mjs';
 import { normGamelog, buildGameLog } from '../lib/espn.mjs';
 import { normalOver } from '../lib/pricing.mjs';
-import { propOver } from '../public/betmath.js';
+import { propOver, bookLine } from '../public/betmath.js';
 
 const fx = (name) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'));
 // Copia del game log con otros eventId y un año antes: hace de temporada anterior (el fixture trae solo 6 partidos).
@@ -18,11 +18,15 @@ const nbaLog = (lists = [fx('gamelog-nba.json'), rekey(fx('gamelog-nba.json'), '
   buildGameLog({ id: '4433188', name: 'Devin Carter' }, 'basketball', lists.map((j) => normGamelog(j, 'basketball')));
 const ctx = { league: 'nba', gameId: '401871339', start: '2026-05-18T00:00:00.000Z', team: 'BOS', opp: 'DET' };
 
-test('propLine: mínimo de 8 partidos, línea = mediana redondeada a .5', () => {
+test('propLine: mínimo de 8 partidos, línea = el .5 con Más más cerca del 50 % (como Betano)', () => {
   assert.equal(propLine([1, 2, 3, 4, 5, 6, 7]), null);
-  const r = propLine(Array(20).fill(10));
-  assert.equal(r.line, 10.5);
-  assert.ok(r.pOver < 0.5, `pOver ${r.pOver}`);
+  for (const [vals, kind] of [[Array(20).fill(10), 'count'], [[25, 31, 18, 22, 27, 30, 19, 24, 26, 21], 'normal']]) {
+    const r = propLine(vals, kind);
+    const off = (l) => Math.abs(propOver(kind, r.mean, r.variance, l) - 0.5);
+    assert.ok(off(r.line) <= off(r.line - 1) && off(r.line) <= off(r.line + 1), `${kind}: línea ${r.line}`);
+  }
+  // Un robo por partido: Betano lo pone en 0.5 (Herro, 2026-11-04); la mediana + 0.5 daba 1.5 con el Menos al ~75 %.
+  assert.equal(propLine([1, 0, 2, 1, 1, 0, 1, 2, 1, 0, 1, 1]).line, 0.5);
 });
 
 test('pts usa la normal; los conteos, la binomial negativa', () => {
@@ -204,10 +208,12 @@ test('rival: oppEvents/oppTotals suman lo permitido contra la media previa; el f
   assert.equal(withOpp(r, 'binary', 1.2), r);
 });
 
-test('playerProps: con el rival en contra de los puntos sube la P(Más) de pts y no toca las demás', () => {
+test('playerProps: con el rival en contra de los puntos sube la media de pts y su línea sale de esa media; no toca las demás', () => {
   const plain = playerProps(nbaLog(), 'basketball', ctx);
   const tough = playerProps(nbaLog(), 'basketball', { ...ctx, oppStats: { cfg: OPP.nba, totals: { pts: { v: 1100, e: 1000 } } } });
   const over = (ps, s) => ps.find((p) => p.stat === s && p.side === 'Over');
-  assert.ok(over(tough, 'pts').p > over(plain, 'pts').p);
+  const t = over(tough, 'pts');
+  assert.ok(t.mean > over(plain, 'pts').mean && t.line >= over(plain, 'pts').line);
+  assert.equal(t.line, bookLine('normal', t.mean, t.variance));
   assert.equal(over(tough, 'reb')?.p, over(plain, 'reb')?.p);
 });
