@@ -328,3 +328,51 @@ test('mercados: si ESPN corta los calendarios, el error se recuerda 60 s antes d
     assert.ok(schedules > n, 'pasados 60 s se reintenta');
   });
 });
+
+// ---------- mejores apuestas con lo aprendido (registro de picks) ----------
+test('mejores apuestas: sin modelo, p = raw; con uno que encoge dc, la p y la cuota mínima salen de la ajustada', async () => {
+  const { picksOf, minOdds } = await import('../lib/markets.mjs');
+  const ms = marketsFor('soccer', { kind: 'poisson', lh: 2.2, la: 0.7 });
+  for (const p of picksOf('soccer', ms)) assert.equal(p.p, p.raw);
+  const model = { sports: { soccer: { status: 'en_uso', markets: { dc: { a: 0, b: 0.5, n: 100 } } } } };
+  const dc = picksOf('soccer', ms, { model, league: 'laliga', x: {} }).find((p) => p.market === 'dc');
+  assert.ok(dc.p < dc.raw - 0.05, `${dc.p} vs ${dc.raw}`);
+  assert.equal(dc.minOdds, minOdds(dc.p));
+  assert.equal(dc.fair, Math.round((1 / dc.p) * 100) / 100);
+});
+
+test('mejores apuestas: side es la posición en el mercado completo, aunque publishable quite una doble oportunidad', async () => {
+  const { picksOf } = await import('../lib/markets.mjs');
+  const { publishable } = await import('../lib/pricing.mjs');
+  const ms = publishable(marketsFor('soccer', { kind: 'poisson', lh: 3.5, la: 0.3 }));
+  assert.ok(!pick(ms, 'dc').selections.some((s) => s.name === 'Local o empate')); // sobre MAX_P: fuera
+  const dc = picksOf('soccer', ms).find((p) => p.market === 'dc');
+  assert.equal(dc.name, 'Local o visitante');
+  assert.equal(dc.side, 1);
+  const away = picksOf('soccer', marketsFor('soccer', { kind: 'poisson', lh: 0.5, la: 2.5 })).find((p) => p.market === '1x2');
+  assert.equal(away.name, 'Visitante');
+  assert.equal(away.side, 2);
+});
+
+test('mejores apuestas: getPicks marca el pick del partido (≥ 70 %) y devuelve también los que el ajuste dejó bajo 50 %', async () => {
+  const { getPicks, FEATURED_MIN } = await import('../lib/markets.mjs');
+  assert.equal(FEATURED_MIN, 0.7);
+  const day = (d) => new Date(Date.UTC(2026, 0, 3 + 7 * d, 19)).toISOString();
+  const ids = ['1', '2', '3', '4'];
+  const events = [];
+  let k = 0;
+  for (const h of ids) for (const a of ids) if (h !== a) events.push(ev(`r${k}`, day(k++), h, a, h === '1' ? 3 : 1, a === '1' ? 2 : 1));
+  const g = ev('g', '2026-04-11T19:00:00.000Z', '1', '2', 0, 0, 'pre');
+  const shift = (c) => ({ sports: { soccer: { status: 'en_uso', leagues: { laliga: c } } } });
+  await withEspn(leagueRoute('esp.1', events, [g]), async () => {
+    const plain = (await getPicks('laliga', { date: '20260411' })).data[0];
+    assert.deepEqual(plain.x, { few: 0.4, abs: 0 });
+    for (const [c, featured] of [[1, true], [-1, false]]) {
+      const { picks } = (await getPicks('laliga', { date: '20260411', model: shift(c) })).data[0];
+      assert.equal(Boolean(picks[0].featured), featured, `c = ${c}: ${picks[0].p}`);
+      assert.ok(picks.slice(1).every((p) => !p.featured));
+      for (let i = 1; i < picks.length; i++) assert.ok(picks[i].p <= picks[i - 1].p);
+      if (c < 0) assert.ok(picks.some((p) => p.p < 0.5 && p.raw >= 0.5));
+    }
+  });
+});

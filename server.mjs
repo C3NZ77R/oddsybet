@@ -10,6 +10,7 @@ import { getProps } from './lib/props.mjs';
 import { getMarkets, getPicks, getAccuracy, getTennisGames, atpElo } from './lib/markets.mjs';
 import { getRankings, getPlayer } from './lib/tennis.mjs';
 import { trackFromEnv } from './lib/track-routes.mjs';
+import { currentModel } from './lib/learn.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -51,7 +52,10 @@ function teamLeague(url) {
 const ROUTES = {
   '/api/leagues': async () => ({ source: 'espn', data: LEAGUES }),
   '/api/markets': async (url) => getMarkets(leagueParam(url), { game: param(url, 'game', RX.id), date: param(url, 'date', RX.date) }),
-  '/api/picks': async (url) => getPicks(leagueParam(url), { date: param(url, 'date', RX.date) }),
+  '/api/picks': async (url) => {
+    const league = leagueParam(url), date = param(url, 'date', RX.date);
+    return getPicks(league, { date, model: await currentModel() }); // con lo que aprendió el registro de picks
+  },
   '/api/accuracy': async () => ({ source: 'oddsy', data: getAccuracy() }),
   '/api/games': async (url) => {
     const lg = leagueParam(url);
