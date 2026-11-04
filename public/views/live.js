@@ -22,7 +22,8 @@ export const keepOrder = (prev, idOf, rule) => (a, b) => {
   const i = prev.indexOf(idOf(a)), j = prev.indexOf(idOf(b));
   return (i < 0) - (j < 0) || (i < 0 ? rule(a, b) : i - j);
 };
-const strength = (a, b) => Math.abs(b.z) - Math.abs(a.z);
+// Señales: el nivel y la fuerza solo ordenan las nuevas; las que ya se veían no suben ni bajan al cambiar de nivel.
+export const sigSort = (prev) => keepOrder(prev, (s) => s.id, (a, b) => b.level - a.level || Math.abs(b.z) - Math.abs(a.z));
 
 function paceText(sig, sport) {
   const pct = fmtPct(sig.progress, 0), exp = r1(sig.expected);
@@ -81,7 +82,7 @@ function gameCard(g, x, sigs, sport, inputs, open) {
     ${wp > 0.01 && wp < 0.99 ? h`<p class="lv-wp">Probabilidad de ganar según ESPN: <b>${g.home.abbr} ${fmtPct(wp, 0)}</b> (cuota justa ${fmtOdds(1 / wp)}) · <b>${g.away.abbr} ${fmtPct(1 - wp, 0)}</b> (${fmtOdds(1 / (1 - wp))})</p>` : ''}
     ${g.lastPlay ? h`<p class="lv-play"><small>Última jugada en ESPN${g.lastPlayAt ? ` (de hace ~${minsAgo(g.lastPlayAt)} min)` : ''}:</small> ${g.lastPlay}</p>` : ''}
     ${sigs.length ? h`<div class="lv-sigs" id="lv-sigs-${g.id}">${shown.map((s) => sigCard(s, sport, inputs))}</div>` : h`<p class="empty">${waiting}</p>`}
-    ${sigs.length > MAX_SIGS ? h`<button type="button" class="btn sm lv-more" data-more="${g.id}" aria-expanded="${all}" aria-controls="lv-sigs-${g.id}">${all ? 'Ver menos' : `Ver todas (${sigs.length})`}</button>` : ''}
+    ${sigs.length > MAX_SIGS ? h`<button type="button" class="btn sm lv-more" data-more="${g.id}" aria-expanded="${String(all)}" aria-controls="lv-sigs-${g.id}">${all ? 'Ver menos' : `Ver todas (${sigs.length})`}</button>` : ''}
   </section>`;
 }
 
@@ -127,12 +128,12 @@ export default {
       // en el input al cerrar el teclado) sí repinta y devuelve el foco y el cursor.
       if (!force && Date.now() - typedAt < TYPING_MS) return;
       sigById.clear();
-      const bySig = keepOrder(sigOrder, (s) => s.id, strength);
+      const bySig = sigSort(sigOrder);
       const rows = games.map((g) => {
         want(g.id);
         const x = extras.get(g.id);
         const sigs = x ? [totalSignal(g, x.total, lg.sport), ...propSignals(x.props, g, lg.sport)].filter(Boolean)
-          .sort((a, b) => b.level - a.level || bySig(a, b)) : [];
+          .sort(bySig) : [];
         sigs.forEach((s) => sigById.set(s.id, s));
         return [g, x, sigs];
       }).sort(keepOrder(order, (r) => r[0].id, (a, b) => (b[2][0]?.level ?? 0) - (a[2][0]?.level ?? 0)));

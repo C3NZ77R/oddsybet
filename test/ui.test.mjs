@@ -239,3 +239,26 @@ test('PWA: el servidor sirve el manifiesto con su tipo', async () => {
   await handler({ url: '/manifest.webmanifest', method: 'GET' }, { writeHead(s, h) { headers = h; return this; }, end() {} });
   assert.equal(headers['content-type'], 'application/manifest+json');
 });
+
+test('Partidos: al repintar, el foco vuelve al mismo control de la misma tarjeta', async () => {
+  const { focusSpot, refocus } = await import('../public/views/games.js');
+  globalThis.CSS ??= { escape: (s) => s };
+  const card = (id) => {
+    const els = [{ id: `${id}-link` }, { id: `${id}-pick`, focus() { focused = this.id; } }];
+    const c = { dataset: { id }, querySelectorAll: () => els };
+    els.forEach((e) => { e.closest = () => c; });
+    return c;
+  };
+  let focused = null;
+  const before = [card('1'), card('2')], after = [card('1'), card('2')];
+  const list = (cards) => ({
+    contains: (a) => cards.some((c) => c.querySelectorAll().includes(a)),
+    querySelector: (sel) => cards.find((c) => sel === `.gm-card[data-id="${c.dataset.id}"]`) ?? null,
+  });
+  const spot = focusSpot(list(before), before[1].querySelectorAll()[1]);
+  assert.deepEqual(spot, { id: '2', i: 1 });
+  refocus(list(after), spot);
+  assert.equal(focused, '2-pick');
+  assert.equal(focusSpot(list(before), { closest: () => null }), null); // foco fuera de la lista
+  refocus(list(after), null); // sin foco previo no hace nada
+});
