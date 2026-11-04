@@ -62,6 +62,36 @@ test('server: un partido en sede neutral se cotiza sin ventaja local', () => wit
   assert.notEqual(want(true), want(false));
 }));
 
+// Un solo summary de ESPN (cualquier /summary devuelve `body`); otras rutas fallan fuerte. Cada test usa su propio id: fetchJson cachea por URL.
+async function withSummary(body, fn) {
+  const real = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (!new URL(url).pathname.endsWith('/summary')) throw new Error(`fetch inesperado: ${url}`);
+    return new Response(JSON.stringify(body));
+  };
+  try { await fn(); } finally { globalThis.fetch = real; }
+}
+
+test('server: /api/plays trae el partido y sus jugadas con 10 s de CDN', () => withSummary(fixture('plays-epl.json'), async () => {
+  const { status, body, headers } = await call('/api/plays?league=epl&id=401878762');
+  assert.equal(status, 200);
+  assert.equal(body.source, 'espn');
+  assert.equal(body.data.plays.length, 115);
+  assert.equal(body.data.game.home.abbr, 'NEW');
+  assert.equal(body.data.game.players, undefined);
+  assert.match(headers['cache-control'], /s-maxage=10/);
+}));
+
+test('server: /api/plays valida liga e id, y rechaza tenis', async () => {
+  assert.equal((await call('/api/plays?league=epl')).status, 400);
+  assert.equal((await call('/api/plays?league=epl&id=abc')).status, 400);
+  assert.equal((await call('/api/plays?league=atp&id=1')).status, 400);
+});
+
+test('server: /api/plays da 404 si ESPN no conoce el partido', () => withSummary({}, async () => {
+  assert.equal((await call('/api/plays?league=epl&id=1')).status, 404);
+}));
+
 test('server: /api/accuracy sirve el backtest', async () => {
   const { status, body } = await call('/api/accuracy');
   assert.equal(status, 200);

@@ -70,6 +70,7 @@ const ROUTES = {
   },
   '/api/game': async (url) => ({ source: 'espn', data: await espn.getGame(teamLeague(url), param(url, 'id', RX.id, true)) }),
   '/api/live': async (url) => ({ source: 'espn', data: await espn.getLive(teamLeague(url)) }),
+  '/api/plays': async (url) => ({ source: 'espn', data: await espn.getPlays(teamLeague(url), param(url, 'id', RX.id, true)) }),
   '/api/gamelog': async (url) => ({
     source: 'espn',
     data: await espn.getGamelog(teamLeague(url), param(url, 'athlete', RX.id, true), param(url, 'season', RX.season)),
@@ -102,7 +103,7 @@ const ROUTES = {
 };
 
 // Caché compartida en la CDN de Vercel (la memoria de cada instancia no se comparte): los ratings piden un calendario por equipo.
-const EDGE_S = { '/api/live': 10, '/api/games': 15, '/api/game': 15, '/api/markets': 1800, '/api/picks': 1800, '/api/record': 300, '/api/props': 1800, '/api/accuracy': 86400, '/api/tennis/rankings': 3600, '/api/tennis/player': 1800 };
+const EDGE_S = { '/api/live': 10, '/api/plays': 10, '/api/games': 15, '/api/game': 15, '/api/markets': 1800, '/api/picks': 1800, '/api/record': 300, '/api/props': 1800, '/api/accuracy': 86400, '/api/tennis/rankings': 3600, '/api/tennis/player': 1800 };
 const json = (res, status, body, edge = 0) => res.writeHead(status, {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': edge ? `public, max-age=0, s-maxage=${edge}, stale-while-revalidate=${edge * 4}` : 'no-store',
