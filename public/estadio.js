@@ -2,15 +2,15 @@
 // las usa la vista Estadio (views/stadium.js) y los tests.
 
 // Qué tan cerca de ser gol estuvo cada tipo de jugada de fútbol.
-const WEIGHT = { goal: 5, 'shot-on': 3, post: 3, 'pen-miss': 3, 'shot-off': 2, blocked: 2, corner: 1.5, offside: 0.5 };
+const WEIGHT = { goal: 5, 'shot-on': 3, post: 3, 'pen-miss': 3, 'shot-off': 2, blocked: 2, corner: 1.5, offside: 0.5, 'free-kick': 1 };
 const SIDES = ['home', 'away'];
 
 // Peligro de una jugada de fútbol: el peso del tipo, más si ocurre cerca del arco rival. La x es absoluta (el local ataca
-// hacia 100), así que se pasa al marco de quien ataca. Una falta solo cuenta en el último tercio; sin posición no se sabe
-// dónde fue y vale 0, y el resto de tipos sin posición queda con factor 1.
+// hacia 100), así que se pasa al marco de quien ataca. Un tiro libre (de quien lo gana) solo cuenta en el último tercio; sin
+// posición no se sabe dónde fue y vale 0, la falta no cuenta, y el resto de tipos sin posición queda con factor 1.
 export function danger(p) {
   const ax = Number.isFinite(p.x) ? (p.side === 'home' ? p.x : 100 - p.x) : null;
-  const w = p.kind === 'foul' ? (ax >= 66 ? 1 : 0) : WEIGHT[p.kind] ?? 0;
+  const w = p.kind === 'free-kick' ? (ax >= 66 ? 1 : 0) : WEIGHT[p.kind] ?? 0;
   return ax == null ? w : w * (0.5 + ax / 100);
 }
 

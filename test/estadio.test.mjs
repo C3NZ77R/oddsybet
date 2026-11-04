@@ -7,8 +7,10 @@ const P = (o) => ({ id: String(o.seq ?? 1), seq: 1, t: 0, kind: 'other', side: '
 test('danger: pesa el tipo y la cercanía al arco rival', () => {
   assert.equal(T.danger(P({ kind: 'goal', x: 90 })), 5 * 1.4);
   assert.equal(T.danger(P({ kind: 'shot-on', side: 'away', x: 10 })), 3 * 1.4); // el visitante ataca hacia 0
-  assert.equal(T.danger(P({ kind: 'foul', x: 50 })), 0); // falta lejos del área
-  assert.equal(T.danger(P({ kind: 'foul', x: 70 })), 1 * 1.2);
+  assert.equal(T.danger(P({ kind: 'foul', x: 70 })), 0); // la falta no suma: el peligro es del que gana el tiro libre
+  assert.equal(T.danger(P({ kind: 'free-kick', x: 50 })), 0); // tiro libre lejos del área
+  assert.equal(T.danger(P({ kind: 'free-kick', x: 70 })), 1 * 1.2);
+  assert.equal(T.danger(P({ kind: 'free-kick', side: 'away', x: 30 })), 1 * 1.2); // el visitante ataca hacia 0
   assert.equal(T.danger(P({ kind: 'corner' })), 1.5); // sin posición: factor 1
   assert.equal(T.danger(P({ kind: 'sub' })), 0);
 });
@@ -39,7 +41,7 @@ test('bordes: tiempo añadido, datos sin posición o rotos y listas vacías', ()
   const m = T.momentum([P({ kind: 'corner', t: 5500 }), P({ kind: 'corner', t: 1e12 }), P({ kind: 'corner', t: null }), P({ kind: 'corner', side: null, t: 10 })]);
   assert.equal(m.length, 19); // el tiempo añadido abre un tramo; t roto, nulo o sin lado no
   assert.deepEqual(m[18], { t0: 5400, home: 1.5, away: 0 });
-  assert.equal(T.danger(P({ kind: 'foul' })), 0); // falta sin posición: no se sabe si fue cerca del área
+  assert.equal(T.danger(P({ kind: 'free-kick' })), 0); // tiro libre sin posición: no se sabe si fue cerca del área
   assert.deepEqual(T.runs([P({ side: 'home', pts: 3 }), P({ side: 'away', pts: 2 })]), []);
   assert.deepEqual(T.heat([], 'home').flat().filter(Boolean), []);
   assert.equal(T.heat([P({ x: 100, y: 0 })], 'home')[0][11], 1); // 100 cae en la última celda

@@ -36,6 +36,20 @@ test('normPlays fútbol: posición y destino se espejan para el visitante y qued
   [home.x, home.y, home.tx, home.ty].forEach((v, i) => near(v, [82.3, 43.3, 92.5, 46.8][i]));
 });
 
+test('normPlays fútbol: "wins a free kick" es un tiro libre del equipo que lo gana, en la misma posición que la falta', () => {
+  const json = fixture('plays-epl.json');
+  const plays = normPlays(json, 'soccer');
+  const foul = plays.find((p) => p.seq === 2), fk = plays.find((p) => p.seq === 3);
+  assert.equal(foul.kind, 'foul'); // ESPN repite la falta con las dos frases, las dos con el equipo que la cometió
+  assert.equal(foul.side, 'home'); // Newcastle
+  assert.equal(fk.kind, 'free-kick');
+  assert.equal(fk.label, 'Tiro libre');
+  assert.equal(fk.side, 'away'); // Everton
+  assert.deepEqual([fk.x, fk.y], [foul.x, foul.y]);
+  const wins = json.commentary.filter((c) => /wins a free kick/i.test(c.text ?? c.play?.text ?? '')).length;
+  assert.equal(plays.filter((p) => p.kind === 'free-kick').length, wins);
+});
+
 test('normPlays fútbol: un autogol cuenta para el rival', () => {
   const json = fixture('plays-epl.json');
   const og = { sequence: 999, time: { value: 600 }, play: { id: 'og1', type: { text: 'Own Goal' }, clock: { value: 600, displayValue: "10'" }, period: { number: 1 }, team: { displayName: 'Newcastle United' }, fieldPositionX: 5, fieldPositionY: 50 } };
