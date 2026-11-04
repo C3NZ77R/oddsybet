@@ -166,6 +166,10 @@
   .pp-dhead, .pp-main, .pp-side { padding: 12px; }
   .pp-who h1 { font-size: 19px; }
   .pp-hctl .pp-field, .pp-hctl .pp-field select { width: 100%; max-width: none; }
+  .pp-sort, .pp-back { padding: 12px 0; margin: -12px 0; }
+  /* Enfrentamiento · Alineaciones · Tendencias caben en 360 px; si no, se encogen dentro del panel en vez de ensanchar la página. */
+  .pp-side { grid-template-columns: minmax(0, 1fr); }
+  .pp-ptabs [role="tab"] { min-width: 0; padding: 6px; font-size: 12px; }
 }
 .pp-ev-big { color: var(--warn); }
 .pp-steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; }

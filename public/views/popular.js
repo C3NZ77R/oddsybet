@@ -159,8 +159,8 @@ export default {
         rows = rows.sort((a, b) => b.hit.pct - a.hit.pct || b.hit.n - a.hit.n).slice(0, TOP);
       }
       root.querySelector('.pop-note').innerHTML = mode === 'act'
-        ? 'Según lo que has hecho en este dispositivo: los props que más abriste o agregaste al boleto. No vemos lo que hacen otros usuarios.'
-        : `Todavía no has ${tab === 'view' ? 'abierto' : 'agregado al boleto'} props de esta liga en este dispositivo. Mientras tanto, te mostramos los que más se han cumplido en los últimos 10 partidos.`;
+        ? 'Los props que más abriste o agregaste al boleto aquí. No vemos lo que hacen otros usuarios.'
+        : `Aún no has ${tab === 'view' ? 'abierto' : 'agregado al boleto'} props de esta liga aquí. Mientras, van los que más se cumplieron en los últimos 10 partidos.`;
       root.querySelector('.pop-progress').innerHTML = loadingLogs
         ? `Calculando aciertos: faltan ${loadingLogs} jugadores…`
         : data.source ? H(ui.sourceBadge(data.source)) : '';

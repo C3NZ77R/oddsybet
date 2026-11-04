@@ -159,11 +159,24 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px
   .toolbar label { flex: 1 1 140px; }
   .toolbar input, .toolbar select { flex: 1; min-width: 0; }
   .dd-val { max-width: 120px; }
+  input, select, textarea { font-size: 16px; } /* con menos, Safari en iPhone acerca la página al tocar el campo */
+  /* Zonas táctiles de al menos ~44 px sin mover el diseño: relleno que el margen negativo devuelve. */
+  .th-sort { padding: 12px 0; margin: -12px 0; }
+  .pk-record summary { padding: 10px 0; }
+  .icon-btn.sm { position: relative; }
+  .icon-btn.sm::after { content: ''; position: absolute; inset: -8px; }
 }
 
 /* Mejores apuestas */
 .pk-game + .pk-game { margin-top: 12px; }
 .pk-game h2 { font-size: 16px; margin: 0 0 4px; }
+/* En el celular la tabla cabe en la tarjeta: el texto se parte en líneas en vez de empujar la página de lado. */
+.pk-game .tbl th, .pk-game .tbl td, .pk-record .tbl th, .pk-record .tbl td { white-space: normal; }
+.pk-game .tbl td small { display: block; }
+@media (max-width: 600px) {
+  .pk-game .tbl th, .pk-game .tbl td, .pk-record .tbl th, .pk-record .tbl td { padding: 8px 5px; }
+  .pk-game .tbl :is(th, td):first-child, .pk-record .tbl :is(th, td):first-child { padding-left: 0; }
+}
 
 /* Mejores apuestas: registro de Oddsy */
 .pk-list, .pk-totals { list-style: none; padding: 0; margin: 0 0 12px; }

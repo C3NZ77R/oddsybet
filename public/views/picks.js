@@ -45,7 +45,7 @@ function learnText(m) {
 
 export function recordHtml(r) {
   if (!r) return '';
-  const intro = h`<p class="hint">Cada pick del partido (★) se guarda antes de que empiece y se cierra solo con el resultado de ESPN. No se borra ninguno, tampoco los perdidos.</p>`;
+  const intro = h`<p class="hint">Guardamos cada pick ★ antes del partido y lo cerramos con el resultado de ESPN. No borramos los perdidos.</p>`;
   if (!r.since) return h`<section class="card pk-record"><h2>Registro de Oddsy</h2>${intro}<p>El registro empieza con el próximo partido que tenga pick.</p></section>`;
   const day = r.day;
   const g = (p) => ({ home: { name: p.home }, away: { name: p.away } });
@@ -97,7 +97,7 @@ export default {
     const rows = res.flatMap(([, pk]) => pk.data ?? []).map((x) => [games.get(x.gameId), x.picks.filter((p) => p.p >= 0.5)])
       .filter(([g, ps]) => g?.status?.state === 'pre' && ps.length).sort(([a], [b]) => a.start.localeCompare(b.start));
     el.innerHTML = h`<div data-record>${recordHtml(record)}</div><header class="view-head"><div><h1>Mejores apuestas · ${lg.title}</h1>
-      <p class="hint">Las apuestas más probables de cada partido según Oddsy, para hoy y los próximos dos días. Apuesta solo si tu casa paga <b>la cuota mínima o más</b>. Si paga menos, a la larga pierdes plata aunque aciertes seguido. «Se cumplió» dice cuántas veces acertó ese tipo de apuesta en la temporada pasada, en partidos que Oddsy no había visto antes.</p></div></header>
+      <p class="hint">Lo más probable de cada partido, de hoy a pasado mañana. Apuesta solo si tu casa paga <b>la cuota mínima o más</b>; si paga menos, pierdes plata a la larga. «Se cumplió» es cuántas veces acertó esa apuesta la temporada pasada.</p></div></header>
       ${acc?.publish === false ? empty('Todavía no mostramos apuestas en esta liga: Oddsy aún no predice mejor que usar los resultados de la temporada pasada.')
         : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps]) => gameCard(g, ps))}` : empty('No hay partidos próximos con apuestas de 50% o más.')}`;
     el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, 8, record, `${location.origin}${location.pathname}#/${lg.id}/picks`))}`, '_blank', 'noopener'));

@@ -142,6 +142,9 @@
   .gm-hteam .gm-hscore, .gm-hteam.gm-home .gm-hscore { margin: 0 0 0 auto; font-size: 24px; }
   .gm-main, .gm-side { padding: 10px; }
   .gm-tag { display: block; }
+  .gm-more, .gm-back { display: inline-block; padding: 12px 0; margin: -12px 0; }
+  .gm-public summary, .gm-how summary, .gm-acc > summary { padding: 10px 0; }
+  .gm-sel-sm { min-height: 44px; }
 }
 
 .gm-acc-chip { float: right; font-weight: 500; text-transform: none; letter-spacing: 0; cursor: help; }

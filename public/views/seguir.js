@@ -60,7 +60,7 @@ function pushHtml(state, err) {
   }
   if (state === 'denied') return h`<h2>Los avisos están bloqueados</h2><p class="hint">Negaste el permiso de notificaciones. Actívalo en los ajustes del celular (Notificaciones → Oddsy, o en Chrome: Configuración del sitio → Notificaciones) y vuelve aquí.</p>${msg}`;
   if (state === 'unsupported') return h`<h2>Los avisos son para el celular</h2><p class="hint">Abre Oddsy en Chrome en Android, o en iPhone agrégalo a la pantalla de inicio desde Safari. Desde ahí activas los avisos y registras tus apuestas.</p>${msg}`;
-  return h`<h2>Activa los avisos</h2><p class="hint">Registra la apuesta que hiciste en tu casa y te avisamos al celular en los momentos que la mueven: cuando se acerca, cuando se cumple o se cae, y el resultado. Sin cuenta ni datos personales.</p>
+  return h`<h2>Activa los avisos</h2><p class="hint">Registra tu apuesta y te avisamos al celular cuando se acerque, se cumpla o se caiga. Sin cuenta ni datos personales.</p>
     <button type="button" class="btn btn-primary" data-enable>Activar avisos</button>${msg}`;
 }
 
@@ -80,7 +80,7 @@ export default {
     const rosters = new Map(); // teamId → atletas
 
     el.innerHTML = h`<header class="view-head"><div><h1>Mis apuestas · NBA</h1>
-      <p class="hint">Sigue en vivo las apuestas de NBA que hiciste en Betplay, Betano u otra casa, sencillas o combinadas. Oddsy no recibe apuestas ni dinero: solo te avisa cómo van.</p></div></header>
+      <p class="hint">Sigue en vivo tus apuestas de NBA de cualquier casa, sencillas o combinadas. Oddsy no recibe apuestas ni dinero.</p></div></header>
       <section class="card sg-push" data-push></section>
       <section class="card sg-add" data-add hidden></section>
       <section class="sg-list" data-list aria-labelledby="sgListTitle"></section>`;
