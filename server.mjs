@@ -11,6 +11,7 @@ import { getMarkets, getPicks, getAccuracy, getTennisGames, atpElo } from './lib
 import { getRankings, getPlayer } from './lib/tennis.mjs';
 import { trackFromEnv } from './lib/track-routes.mjs';
 import { currentModel } from './lib/learn.mjs';
+import { picklogFromEnv, sameSecret } from './lib/picklog.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -57,6 +58,11 @@ const ROUTES = {
     return getPicks(league, { date, model: await currentModel() }); // con lo que aprendió el registro de picks
   },
   '/api/accuracy': async () => ({ source: 'oddsy', data: getAccuracy() }),
+  // Registro de picks de la liga (lib/picklog.mjs); sin Supabase, data null y la vista no lo muestra.
+  '/api/record': async (url) => {
+    const league = leagueParam(url);
+    return { source: 'oddsy', data: picklog() ? await picklog().record(league) : null };
+  },
   '/api/games': async (url) => {
     const lg = leagueParam(url);
     const date = param(url, 'date', RX.date);
@@ -96,7 +102,7 @@ const ROUTES = {
 };
 
 // Caché compartida en la CDN de Vercel (la memoria de cada instancia no se comparte): los ratings piden un calendario por equipo.
-const EDGE_S = { '/api/live': 10, '/api/games': 15, '/api/game': 15, '/api/markets': 1800, '/api/picks': 1800, '/api/props': 1800, '/api/accuracy': 86400, '/api/tennis/rankings': 3600, '/api/tennis/player': 1800 };
+const EDGE_S = { '/api/live': 10, '/api/games': 15, '/api/game': 15, '/api/markets': 1800, '/api/picks': 1800, '/api/record': 300, '/api/props': 1800, '/api/accuracy': 86400, '/api/tennis/rankings': 3600, '/api/tennis/player': 1800 };
 const json = (res, status, body, edge = 0) => res.writeHead(status, {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': edge ? `public, max-age=0, s-maxage=${edge}, stale-while-revalidate=${edge * 4}` : 'no-store',
@@ -137,10 +143,23 @@ async function trackRoute(req, res, url) {
   else json(res, r.status, r.body);
 }
 
+// Registro de picks: el tick (cada 15 min) y el aprendizaje (diario) los dispara pg_cron con el secreto del seguimiento.
+let picklogMemo;
+const picklog = () => (picklogMemo ??= picklogFromEnv() ?? false);
+async function picklogRoute(req, res, url) {
+  if (req.method !== 'POST') throw espn.httpError(405, 'Método no permitido');
+  if (!picklog()) throw espn.httpError(503, 'El registro de picks no está configurado');
+  if (!sameSecret(req.headers?.['x-tick-secret'], picklog().secret)) throw espn.httpError(401, 'Secreto inválido');
+  const job = url.pathname.slice('/api/picklog/'.length);
+  if (job !== 'tick' && job !== 'learn') throw espn.httpError(404, 'No encontrado');
+  json(res, 200, await picklog()[job]());
+}
+
 export async function handler(req, res) {
   const url = new URL(req.url, 'http://localhost');
   try {
     if (url.pathname.startsWith('/api/track/')) return await trackRoute(req, res, url);
+    if (url.pathname.startsWith('/api/picklog/')) return await picklogRoute(req, res, url);
     if (url.pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') throw espn.httpError(405, 'Método no permitido');
       const route = ROUTES[url.pathname];

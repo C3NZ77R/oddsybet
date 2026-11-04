@@ -220,6 +220,15 @@ test('server: /api/track sin configurar → 503 no-store; el resto de /api sigue
 });
 
 async function checkUnconfigured() {
+  // Registro de picks sin configurar: 405 sin POST, 503 con POST, y el registro sale vacío (la vista no lo muestra).
+  assert.equal((await send('GET', '/api/picklog/tick')).status, 405);
+  const tick = await send('POST', '/api/picklog/tick');
+  assert.equal(tick.status, 503);
+  assert.equal(tick.headers['cache-control'], 'no-store');
+  const rec = await call('/api/record?league=nba');
+  assert.equal(rec.status, 200);
+  assert.deepEqual(rec.body, { source: 'oddsy', data: null });
+  assert.equal((await call('/api/record?league=xx')).status, 400);
   const r = await send('POST', '/api/track/read');
   assert.equal(r.status, 503);
   assert.equal(r.headers['cache-control'], 'no-store');
@@ -238,7 +247,7 @@ test('server: readBody acepta JSON hasta 3 MB y usa el cuerpo que ya parseó Ver
 });
 
 test('Vercel: cada carpeta anidada de api/ reexporta el handler (el catch-all de la raíz no las atrapa)', async () => {
-  for (const dir of ['tennis', 'track']) {
+  for (const dir of ['tennis', 'track', 'picklog']) {
     const mod = await import(`../api/${dir}/[...path].mjs`);
     assert.equal(mod.default, handler, dir);
   }
