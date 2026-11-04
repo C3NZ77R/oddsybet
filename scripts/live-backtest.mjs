@@ -75,7 +75,7 @@ export function paired(sport, rows, a, b) {
 }
 
 // Día del scoreboard de ESPN (hora del Este) de un inicio en UTC.
-const etDay = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replaceAll('-', '');
+export const etDay = (iso) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).replaceAll('-', '');
 
 async function rowsOf(id) {
   const { sport, espn } = leagueById(id);
