@@ -1,22 +1,29 @@
 // En vivo (#/<liga>/live): partidos en juego con señales cuando un jugador o el marcador van a un ritmo distinto al
-// esperado, las pausas del partido (buen momento para apostar) y una calculadora con la línea en vivo de tu casa.
-import { h, fmtPct, fmtOdds, teamLogo, empty, errorBox } from '../ui.js';
+// esperado, las pausas del partido y una calculadora con la línea en vivo de tu casa.
+import { h, fmtPct, fmtOdds, teamLogo, empty, errorBox, ago } from '../ui.js';
 import { STATS } from '../stats.js';
 import { expectedValue } from '../betmath.js';
-import { propSignals, totalSignal, mainTotal, parseOdds, liveOver, windowLeft, isActive, LEVELS } from '../live.js';
+import { propSignals, totalSignal, mainTotal, parseOdds, liveOver, isActive, LEVELS } from '../live.js';
 
 const REFRESH_MS = 15_000;
+const MAX_SIGS = 5; // señales visibles por partido antes de «Ver todas»
 const TYPING_MS = 5_000; // sin repintar mientras escribe (iOS cierra el teclado al reemplazar el input)
 const SIDE = { Over: 'Más de', Under: 'Menos de' };
 const UNIT = { basketball: 'puntos', soccer: 'goles' };
 const r1 = (x) => Math.round(x * 10) / 10;
-const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const toNum = (v) => (String(v ?? '').trim() === '' ? NaN : Number(String(v).replace(',', '.')));
 const parseLine = (v) => { const x = toNum(v); return Number.isFinite(x) && x >= 0 ? x : null; };
 
 const minsAgo = (iso) => Math.max(1, Math.round((Date.now() - Date.parse(iso)) / 60_000));
 const stopOn = (g) => (g.stop && isActive(g.stop) ? g.stop : null); // las pausas cortas ya terminaron cuando ESPN las publica
-const leftText = (s) => (s == null ? 'buen momento para mirar tu casa' : s > 0 ? `el juego seguiría en ~${mmss(s)}` : 'el juego debería seguir ya');
+
+// Orden estable entre refrescos: lo que ya se veía conserva su lugar y lo nuevo entra después, según `rule`.
+export const keepOrder = (prev, idOf, rule) => (a, b) => {
+  const i = prev.indexOf(idOf(a)), j = prev.indexOf(idOf(b));
+  return (i < 0) - (j < 0) || (i < 0 ? rule(a, b) : i - j);
+};
+// Señales: el nivel y la fuerza solo ordenan las nuevas; las que ya se veían no suben ni bajan al cambiar de nivel.
+export const sigSort = (prev) => keepOrder(prev, (s) => s.id, (a, b) => b.level - a.level || Math.abs(b.z) - Math.abs(a.z));
 
 function paceText(sig, sport) {
   const pct = fmtPct(sig.progress, 0), exp = r1(sig.expected);
@@ -25,17 +32,19 @@ function paceText(sig, sport) {
     : `Van ${sig.current} ${UNIT[sport]} con el ${pct} jugado; lo esperado a esta altura eran ${exp}.`;
 }
 
-// Probabilidades con la línea que escribió el usuario y, con cuota, si a la larga gana o pierde.
-function calcText(sig, v) {
+// Probabilidades con la línea que escribió el usuario y, con cuota, el valor esperado según el modelo (no una promesa).
+export function calcText(sig, v) {
   const line = parseLine(v.line);
   if (line == null) return 'Escribe la línea que muestra tu casa ahora para ver qué tan probable es.';
   const over = liveOver(sig.kind, sig.current, sig.rem, line);
   const p = sig.side === 'Over' ? over : 1 - over;
   const odds = parseOdds(v.odds);
-  const head = `${SIDE.Over} ${line}: ${fmtPct(over, 0)} · ${SIDE.Under} ${line}: ${fmtPct(1 - over, 0)}. Cuota justa para «${SIDE[sig.side]}»: ${p > 0.01 ? fmtOdds(1 / p) : '—'}.`;
+  const head = `Según el modelo de Oddsy: ${SIDE.Over} ${line}: ${fmtPct(over, 0)} · ${SIDE.Under} ${line}: ${fmtPct(1 - over, 0)}. Cuota justa para «${SIDE[sig.side]}»: ${p > 0.01 ? fmtOdds(1 / p) : '—'}.`;
   if (!odds) return head;
   const ev = Math.round(expectedValue(p, odds) * 100);
-  return `${head} ${ev > 0 ? `Con esa cuota, a la larga ganarías ~$${ev} por cada $100.` : `Con esa cuota, a la larga perderías ~$${-ev} por cada $100: no conviene.`}`;
+  // Mejores apuestas pide 5 % sobre la justa por el error del modelo: aquí se dice lo mismo.
+  const cushion = ev > 0 && ev < 5 ? ' Es menos que el colchón del 5 % que Oddsy usa por el error del modelo.' : '';
+  return `${head} El valor esperado con esa cuota es de ${ev > 0 ? '+' : ''}${ev} %.${cushion} Los datos de ESPN van atrasados y el modelo se puede equivocar.`;
 }
 
 function sigCard(sig, sport, inputs) {
@@ -58,8 +67,9 @@ function sigCard(sig, sport, inputs) {
 
 const team = (t) => h`<span class="lv-team">${teamLogo(t)}<b>${t.abbr || t.name}</b><b class="lv-pts">${t.score ?? 0}</b></span>`;
 
-function gameCard(g, x, sigs, sport, inputs) {
+function gameCard(g, x, sigs, sport, inputs, open) {
   const wp = g.winProb, stop = stopOn(g);
+  const all = open.has(g.id), shown = all ? sigs : sigs.slice(0, MAX_SIGS);
   const waiting = !x ? 'Cargando las líneas de Oddsy de este partido…'
     : g.progress < 0.1 ? 'Todavía es temprano para leer el ritmo: las señales salen después del 10% del partido.'
       : 'Sin señales por ahora: todos van al ritmo esperado.';
@@ -67,11 +77,12 @@ function gameCard(g, x, sigs, sport, inputs) {
     <header class="lv-head">
       <div class="lv-teams">${team(g.away)}<span class="lv-vs">@</span>${team(g.home)}</div>
       <p class="lv-status"><span class="gm-live">En vivo</span> ${g.status?.detail ?? ''}</p>
-      ${stop ? h`<p class="lv-stop" data-stop-at="${stop.at ?? ''}" data-stop-kind="${stop.kind}"><b>Pausa: ${stop.label}</b> · <span data-left>${leftText(windowLeft(stop))}</span></p>` : ''}
+      ${stop ? h`<p class="lv-stop">Pausa: ${stop.label}</p>` : ''}
     </header>
     ${wp > 0.01 && wp < 0.99 ? h`<p class="lv-wp">Probabilidad de ganar según ESPN: <b>${g.home.abbr} ${fmtPct(wp, 0)}</b> (cuota justa ${fmtOdds(1 / wp)}) · <b>${g.away.abbr} ${fmtPct(1 - wp, 0)}</b> (${fmtOdds(1 / (1 - wp))})</p>` : ''}
     ${g.lastPlay ? h`<p class="lv-play"><small>Última jugada en ESPN${g.lastPlayAt ? ` (de hace ~${minsAgo(g.lastPlayAt)} min)` : ''}:</small> ${g.lastPlay}</p>` : ''}
-    ${sigs.length ? h`<div class="lv-sigs">${sigs.map((s) => sigCard(s, sport, inputs))}</div>` : h`<p class="empty">${waiting}</p>`}
+    ${sigs.length ? h`<div class="lv-sigs" id="lv-sigs-${g.id}">${shown.map((s) => sigCard(s, sport, inputs))}</div>` : h`<p class="empty">${waiting}</p>`}
+    ${sigs.length > MAX_SIGS ? h`<button type="button" class="btn sm lv-more" data-more="${g.id}" aria-expanded="${String(all)}" aria-controls="lv-sigs-${g.id}">${all ? 'Ver menos' : `Ver todas (${sigs.length})`}</button>` : ''}
   </section>`;
 }
 
@@ -81,7 +92,17 @@ export default {
     const extras = new Map(); // gameId -> { props, total } | null mientras carga
     const inputs = new Map(); // id de señal -> { line, odds } que escribió el usuario
     const sigById = new Map();
-    let games = [], err = null, typedAt = 0;
+    const open = new Set(); // partidos con todas las señales a la vista
+    let games = [], err = null, typedAt = 0, okAt = 0, paused = false, last = '', lastNote = '', order = [], sigOrder = [];
+
+    el.innerHTML = h`<header class="view-head"><div><h1>En vivo · ${lg.title}</h1>
+      <p class="hint">Oddsy mira cada partido en juego y avisa cuando un jugador o el marcador van a un ritmo distinto al esperado. Escribe la línea en vivo de tu casa y te mostramos lo que estima el modelo de Oddsy. No son picks: tú decides.</p>
+      <p class="hint"><small>Datos de ESPN; se actualiza cada 15 s. ESPN publica cada jugada con unos minutos de atraso (unos 6), así que tu casa va más adelante: revisa el marcador y el precio antes de apostar.</small></p></div></header>
+      <div class="lv-bar"><span class="hint" data-age></span><button type="button" class="btn sm" data-pause aria-pressed="false">Pausar actualización</button></div>
+      <p class="lv-note" role="status" data-note></p>
+      <div data-body></div>`;
+    const body = el.querySelector('[data-body]'), note = el.querySelector('[data-note]'), age = el.querySelector('[data-age]');
+    const showAge = () => { age.textContent = okAt ? `Actualizado ${ago(new Date(okAt).toISOString())}` : ''; };
 
     const want = (id) => {
       if (extras.has(id)) return;
@@ -92,30 +113,44 @@ export default {
       ]).then(([props, total]) => { extras.set(id, { props, total }); paint(); });
     };
 
-    const paint = () => {
+    // force: lo pidió el usuario (Ver todas, Reintentar), así que pinta aunque esté en pausa.
+    const paint = (force = false) => {
+      showAge();
+      // Un fallo con datos previos no borra nada: avisa y se reintenta en el siguiente ciclo.
+      const noteHtml = err && okAt ? h`No se pudo actualizar. Ves los últimos datos que cargaron. <button type="button" class="btn sm" data-reload>Reintentar</button>`.toString() : '';
+      if (noteHtml !== lastNote) { // sin repetir el aviso al lector de pantalla en cada ciclo
+        const refocus = note.contains(document.activeElement);
+        note.innerHTML = lastNote = noteHtml;
+        if (refocus) note.querySelector('button')?.focus();
+      }
+      if (paused && !force) return;
       // Mientras escribe no se repinta: en iOS reemplazar el input cierra el teclado. Con el foco quieto (en Android queda
       // en el input al cerrar el teclado) sí repinta y devuelve el foco y el cursor.
-      if (Date.now() - typedAt < TYPING_MS) return;
-      const a = document.activeElement;
-      const typing = a?.tagName === 'INPUT' && el.contains(a) ? { sig: a.closest('[data-sig]')?.dataset.sig, name: a.name, from: a.selectionStart, to: a.selectionEnd } : null;
+      if (!force && Date.now() - typedAt < TYPING_MS) return;
       sigById.clear();
+      const bySig = sigSort(sigOrder);
       const rows = games.map((g) => {
         want(g.id);
         const x = extras.get(g.id);
         const sigs = x ? [totalSignal(g, x.total, lg.sport), ...propSignals(x.props, g, lg.sport)].filter(Boolean)
-          .sort((a, b) => b.level - a.level || Math.abs(b.z) - Math.abs(a.z)) : [];
+          .sort(bySig) : [];
         sigs.forEach((s) => sigById.set(s.id, s));
         return [g, x, sigs];
-      }).sort(([a, , sa], [b, , sb]) => !!stopOn(b) - !!stopOn(a) || (sb[0]?.level ?? 0) - (sa[0]?.level ?? 0)); // en pausa, arriba
-      el.innerHTML = h`<header class="view-head"><div><h1>En vivo · ${lg.title}</h1>
-        <p class="hint">Oddsy mira cada partido en juego y avisa cuando un jugador o el marcador van a un ritmo distinto al esperado. Escribe la línea en vivo de tu casa y te decimos qué tan probable es y si la cuota vale la pena. Los partidos en medio tiempo van arriba: es buen momento para apostar. No son picks: tú decides.</p>
-        <p class="hint"><small>Datos de ESPN; se actualiza cada 15 s. ESPN publica cada jugada con unos minutos de atraso (unos 6), así que tu casa va más adelante: revisa el marcador y el precio antes de apostar.</small></p></div></header>
-        ${err ? errorBox(err) : rows.length ? rows.map(([g, x, s]) => gameCard(g, x, s, lg.sport, inputs))
-          : h`${empty(`No hay partidos de ${lg.title} en juego ahora.`)}<p><a class="btn" href="#/${lg.id}/games">Ver los próximos partidos</a></p>`}`;
-      const input = typing?.sig && el.querySelector(`[data-sig="${CSS.escape(typing.sig)}"] [name="${typing.name}"]`);
-      if (input) {
-        input.focus();
-        input.setSelectionRange(typing.from, typing.to);
+      }).sort(keepOrder(order, (r) => r[0].id, (a, b) => (b[2][0]?.level ?? 0) - (a[2][0]?.level ?? 0)));
+      order = rows.map((r) => r[0].id);
+      sigOrder = rows.flatMap((r) => r[2].map((s) => s.id));
+      const html = (err && !okAt ? errorBox(err) : rows.length ? h`${rows.map(([g, x, s]) => gameCard(g, x, s, lg.sport, inputs, open))}`
+        : h`${empty(`No hay partidos de ${lg.title} en juego ahora.`)}<p><a class="btn" href="#/${lg.id}/games">Ver los próximos partidos</a></p>`).toString();
+      if (html === last) return; // nada cambió: no se toca el DOM (el lector de pantalla no pierde su lugar)
+      last = html;
+      const a = document.activeElement;
+      const at = body.contains(a) ? { sig: a.closest('[data-sig]')?.dataset.sig, name: a.name, more: a.dataset.more, from: a.selectionStart, to: a.selectionEnd } : null;
+      body.innerHTML = html;
+      const back = at?.more ? body.querySelector(`[data-more="${CSS.escape(at.more)}"]`)
+        : at?.sig && body.querySelector(`[data-sig="${CSS.escape(at.sig)}"] [name="${at.name}"]`);
+      if (back) {
+        back.focus();
+        if (back.tagName === 'INPUT') back.setSelectionRange(at.from, at.to);
       }
     };
 
@@ -123,10 +158,12 @@ export default {
       try {
         games = (await api.get('/api/live', { league: lg.id }, { fresh: true })).data ?? [];
         err = null;
+        okAt = Date.now();
       } catch (e) {
         err = e;
       }
     };
+    const refreshNow = () => { if (!document.hidden && !paused) load().then(() => paint()); };
 
     el.addEventListener('input', (e) => {
       typedAt = Date.now();
@@ -137,13 +174,28 @@ export default {
       inputs.set(sig.id, v);
       card.querySelector('output').textContent = calcText(sig, v);
     });
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.more) {
+        if (!open.delete(b.dataset.more)) open.add(b.dataset.more);
+        paint(true);
+      } else if (b.hasAttribute('data-pause')) {
+        paused = !paused;
+        b.setAttribute('aria-pressed', String(paused));
+        b.textContent = paused ? 'Reanudar' : 'Pausar actualización';
+        refreshNow();
+      } else if (b.hasAttribute('data-reload')) {
+        b.disabled = true;
+        load().then(() => { b.disabled = false; paint(true); });
+      }
+    });
 
     await load();
     paint();
-    const refresh = setInterval(() => { if (!document.hidden) load().then(paint); }, REFRESH_MS);
-    const tick = setInterval(() => {
-      for (const p of el.querySelectorAll('[data-stop-at]')) p.querySelector('[data-left]').textContent = leftText(windowLeft({ kind: p.dataset.stopKind, at: p.dataset.stopAt }));
-    }, 1000);
-    return () => { clearInterval(refresh); clearInterval(tick); };
+    const refresh = setInterval(refreshNow, REFRESH_MS);
+    const ageTick = setInterval(showAge, 5_000);
+    document.addEventListener('visibilitychange', refreshNow); // al volver de la app de la casa, datos al día
+    return () => { clearInterval(refresh); clearInterval(ageTick); document.removeEventListener('visibilitychange', refreshNow); };
   },
 };

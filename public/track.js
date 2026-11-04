@@ -1,6 +1,7 @@
 // Seguimiento de apuestas en el navegador: permiso y suscripción de avisos, foto del ticket reducida y llamadas a
 // /api/track/* con el id y el secreto del dispositivo (store 'track').
 import { store } from './store.js';
+import { SLOW } from './api.js';
 
 // 'ok' se pueden activar · 'ios-install' iPhone sin agregar a inicio · 'denied' permiso negado · 'unsupported' sin push.
 export function pushSupport({ standalone, hasPush, ios, permission }) {
@@ -20,19 +21,29 @@ const auth = () => {
   return t ? { 'x-device-id': t.deviceId, 'x-device-secret': t.secret } : {};
 };
 
+// 30 s: leer el ticket con Gemini puede tardar hasta 20 s en el servidor.
+const TIMEOUT = 30_000;
 async function call(method, path, body) {
-  let res;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+  let res, data;
   try {
-    res = await fetch(`/api/track/${path}`, {
-      method,
-      headers: { ...auth(), ...(body !== undefined && { 'content-type': 'application/json' }) },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  } catch {
-    throw new Error('No se pudo conectar con el servidor. Revisa tu conexión.');
+    try {
+      res = await fetch(`/api/track/${path}`, {
+        method,
+        headers: { ...auth(), ...(body !== undefined && { 'content-type': 'application/json' }) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+    } catch {
+      throw new Error(ctrl.signal.aborted ? SLOW : 'No se pudo conectar con el servidor. Revisa tu conexión.');
+    }
+    if (res.status === 204) return null;
+    data = await res.json().catch(() => ({}));
+    if (ctrl.signal.aborted) throw new Error(SLOW);
+  } finally {
+    clearTimeout(timer);
   }
-  if (res.status === 204) return null;
-  const data = await res.json().catch(() => ({}));
   if (res.status === 401 && store.get('track')) store.set('track', null); // el servidor ya no conoce este celular
   if (!res.ok) throw Object.assign(new Error(data.error || `El servidor respondió ${res.status}.`), { status: res.status });
   return data;

@@ -16,6 +16,13 @@ const BET_STATUS = { pendiente: 'Por empezar', en_juego: 'En juego', ganada: 'Ga
 let nextKey = 0;
 const blank = () => ({ key: ++nextKey, market: 'prop', gameId: '', stat: 'pts', athleteId: '', side: 'Over', line: '', odds: '', label: '', reason: null, fixed: false });
 
+// Un refresco fallido no borra la lista que ya se veía: deja un aviso (una sola vez) y el siguiente ciclo reintenta.
+export function listFailed(box, err) {
+  const title = box.querySelector('#sgListTitle');
+  if (!title) { if (box.textContent !== err.message) box.innerHTML = h`<p class="sg-msg" role="alert">${err.message}</p>`; } // sin repetir la alerta
+  else if (!box.querySelector('[data-listerr]')) title.insertAdjacentHTML('afterend', String(h`<p class="sg-msg" role="status" data-listerr>No se pudo actualizar. Ves la última lista que cargó; se reintenta solo.</p>`));
+}
+
 // Borrador de /api/track/read → filas editables.
 export function rowsOf(draft) {
   return draft.map((d) => ({
@@ -152,7 +159,7 @@ export default {
       try {
         bets = (await trackApi.listBets()).bets ?? [];
       } catch (err) {
-        box.innerHTML = h`<p class="sg-msg" role="alert">${err.message}</p>`;
+        listFailed(box, err);
         return;
       }
       box.innerHTML = h`<h2 id="sgListTitle">Apuestas que sigues</h2>${bets.length ? bets.map((b) => {

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { pushSupport, b64ToBytes } from '../public/track.js';
-import { rowsOf, payloadOf } from '../public/views/seguir.js';
+import { rowsOf, payloadOf, listFailed } from '../public/views/seguir.js';
 
 test('pushSupport: iPhone sin instalar, permiso negado y navegadores sin push', () => {
   assert.equal(pushSupport({ standalone: false, hasPush: true, ios: true, permission: 'default' }), 'ios-install');
@@ -51,4 +51,35 @@ test('payloadOf: línea vacía no se manda como 0; Sí/No va con 0.5', () => {
   assert.equal(payloadOf([{ ...row(), line: '  ' }])[0].line, null);
   assert.equal(payloadOf([{ ...row(), line: '0' }])[0].line, 0);
   assert.equal(payloadOf([{ ...row({ stat: 'dd' }), line: '' }])[0].line, 0.5);
+});
+
+test('listFailed: con lista ya pintada la conserva y avisa una sola vez; sin lista muestra el error', () => {
+  const box = (hasList) => {
+    const b = { innerHTML: '', textContent: '', notes: 0, err: false };
+    const title = { insertAdjacentHTML: (pos, html) => { assert.equal(pos, 'afterend'); assert.match(html, /data-listerr/); b.notes++; b.err = true; } };
+    b.querySelector = (sel) => (sel === '#sgListTitle' ? (hasList ? title : null) : sel === '[data-listerr]' && b.err ? {} : null);
+    return b;
+  };
+  const kept = box(true);
+  kept.innerHTML = 'lista';
+  listFailed(kept, new Error('Sin conexión'));
+  listFailed(kept, new Error('Sin conexión'));
+  assert.equal(kept.innerHTML, 'lista');
+  assert.equal(kept.notes, 1);
+
+  const none = box(false);
+  listFailed(none, new Error('Sin <conexión>'));
+  assert.match(String(none.innerHTML), /role="alert">Sin &lt;conexión&gt;</);
+});
+
+test('trackApi: una petición colgada se corta a los 30 s con un error claro', async (t) => {
+  const { trackApi } = await import('../public/track.js');
+  const real = globalThis.fetch;
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  globalThis.fetch = (url, { signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('abort'))));
+  try {
+    const p = trackApi.listBets();
+    t.mock.timers.tick(30_000);
+    await assert.rejects(p, /tardó demasiado/);
+  } finally { globalThis.fetch = real; }
 });

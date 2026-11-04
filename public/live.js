@@ -144,7 +144,7 @@ export function scoringShare(sport, f, curves = CURVE) {
 const PLAYER_CURVE = { basketball: [0.268, 0.519, 0.779] };
 export const playerShare = (sport, f) => scoringShare(sport, f, PLAYER_CURVE);
 
-// ---------- pausas: momento para apostar ----------
+// ---------- pausas del partido ----------
 // Orden: lo específico antes que "timeout" o "end". Duraciones típicas en segundos (estimación, no reloj oficial).
 const STOPS = [
   [/official timeout|tv timeout/i, 'tv', 'Pausa comercial', 150],
