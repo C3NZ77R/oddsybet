@@ -41,7 +41,7 @@ create table pick_model (
 
 create table pick_state (
   id int primary key default 1 check (id = 1),
-  backfill jsonb not null default '{}'      -- { day: 'YYYYMMDD', league: índice en LEAGUES, until: 'YYYYMMDD' }
+  backfill jsonb not null default '{}'      -- { league: índice en LEAGUES, day, from, until: 'YYYYMMDD', fails }
 );
 insert into pick_state default values;
 

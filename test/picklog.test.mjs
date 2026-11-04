@@ -2,7 +2,7 @@
 // registro público. Base y ESPN falsos en memoria: sin red.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gradePick, reasonOf, scoreOf, runTick, runLearn, recordOf, dayOf, sameSecret, BACKFILL_DAYS } from '../lib/picklog.mjs';
+import { gradePick, reasonOf, scoreOf, runTick, runLearn, recordOf, dayOf, sameSecret, BACKFILL_DAYS, BACKFILL_STEPS } from '../lib/picklog.mjs';
 import { LEAGUES } from '../public/leagues.js';
 
 const soc = (market, side, line, home, away, name = 'STATUS_FULL_TIME') => gradePick({ sport: 'soccer', market, side, line }, { home, away, name });
@@ -102,7 +102,7 @@ function deps(db, { board = {}, picks = {}, results = {}, past = {} } = {}) {
     pastPicks: async (lg, date) => ({ data: only(past, lg, date, []) }),
   };
 }
-const done = { day: '20000101', league: 0, until: '20000102' }; // relleno ya terminado
+const done = { league: 99, from: '20000101' }; // relleno ya terminado
 
 test('tick: congela solo los partidos en pre que empiezan en menos de 3 h, con todo lo que se mostró', async () => {
   const db = memDb(done);
@@ -154,38 +154,39 @@ test('tick: cierra con el resultado, anula aplazados y, sin resultado a los 3 d�
   assert.match(g('colombia:a:1x2').reason, /^Se perdió por poco \(por 1 gol\); inicio de temporada/);
 });
 
-test('tick: el relleno reconstruye hacia atrás, guarda backfill ya calificado, avanza el cursor y para en until', async () => {
-  const db = memDb();
+test('tick: el relleno arranca en ayer y 120 días atrás, guarda backfill ya calificado y recorre una liga entera antes de la siguiente', async () => {
+  const fresh = memDb();
+  await runTick(deps(fresh), { now: NOW });
+  assert.deepEqual(fresh.state(), { league: 0, day: '20261025', from: '20261102', until: '20260706', fails: 0 }); // 8 días de la NBA por tick
+  assert.equal(BACKFILL_DAYS, 120);
+  assert.equal(BACKFILL_STEPS, 8);
+
   const y = '20261102', col = LEAGUES.findIndex((l) => l.id === 'colombia');
+  const db = memDb({ league: col, day: y, from: y, until: '20261101', fails: 0 });
   const past = { [y]: [{ gameId: 'p', x: {}, picks: [pk('dc', 0.8), pk('ou', 0.6, { line: 2.5 })] }, { gameId: 'q', x: {}, picks: [pk('dc', 0.7)] }] };
   const board = { [y]: [game('p', NOW - 30 * 3_600_000, 'post'), game('q', NOW - 30 * 3_600_000, 'post')] };
   const results = { [y]: { p: { home: 1, away: 0, name: 'STATUS_FULL_TIME' } } }; // q sin resultado: no entra
-  await runTick({ ...deps(db, { board, past, results }), games: async (lg, date) => (lg.id === 'colombia' ? board[date] ?? [] : []) }, { now: NOW });
-  const rows = [...db.rows.values()];
-  assert.deepEqual(rows.map((r) => [r.id, r.source, r.status]).sort(), [['colombia:p:dc', 'backfill', 'ganada'], ['colombia:p:ou', 'backfill', 'perdida']]);
-  const s = db.state();
-  assert.equal(s.until, '20260706'); // 120 días antes de ayer… desde hoy
-  assert.ok(s.day < y || (s.day === y && s.league > col));
-  assert.equal(BACKFILL_DAYS, 120);
-  // Terminado: no pide nada más.
-  const db2 = memDb(done);
+  const out = await runTick(deps(db, { board, past, results }), { now: NOW });
+  assert.equal(out.backfilled, 2);
+  assert.deepEqual([...db.rows.values()].map((r) => [r.id, r.source, r.status]).sort(), [['colombia:p:dc', 'backfill', 'ganada'], ['colombia:p:ou', 'backfill', 'perdida']]);
+  assert.deepEqual(db.state(), { league: LEAGUES.length, day: y, from: y, until: '20261101', fails: 0 }); // colombia 2 días, atp 2 días y fin
+
   let asked = 0;
-  await runTick({ ...deps(db2), pastPicks: async () => (asked++, { data: [] }) }, { now: NOW });
-  assert.equal(asked, 0);
-  // Sin plazo: no rellena.
-  const db3 = memDb();
-  await runTick({ ...deps(db3), pastPicks: async () => (asked++, { data: [] }) }, { now: NOW, budgetMs: 0 });
+  const count = (d) => ({ ...d, pastPicks: async () => (asked++, { data: [] }) });
+  await runTick(count(deps(db)), { now: NOW }); // terminado: no pide nada más
+  await runTick(count(deps(memDb())), { now: NOW, budgetMs: 0 }); // sin plazo: no rellena
   assert.equal(asked, 0);
 });
 
 test('tick: un paso del relleno que falla se reintenta y a la tercera se salta', async () => {
-  const db = memDb({ day: '20261102', league: 0, until: '20260706', fails: 0 });
+  const db = memDb({ league: 0, day: '20261102', from: '20261102', until: '20260706', fails: 0 });
   const failing = { ...deps(db), pastPicks: async () => { throw new Error('ESPN caído'); } };
   await runTick(failing, { now: NOW });
-  assert.deepEqual(db.state(), { day: '20261102', league: 0, until: '20260706', fails: 1 });
+  assert.equal(db.state().fails, 1);
+  assert.equal(db.state().day, '20261102');
   await runTick(failing, { now: NOW });
   await runTick(failing, { now: NOW });
-  assert.equal(db.state().league, 1);
+  assert.equal(db.state().day, '20261101');
 });
 
 test('learn: lee las filas cerradas por deporte y guarda un modelo válido', async () => {
