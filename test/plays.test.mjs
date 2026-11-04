@@ -46,6 +46,7 @@ test('normPlays fútbol: "wins a free kick" es un tiro libre del equipo que lo g
   assert.equal(fk.label, 'Tiro libre');
   assert.equal(fk.side, 'away'); // Everton
   assert.deepEqual([fk.x, fk.y], [foul.x, foul.y]);
+  assert.deepEqual([foul.who, fk.who], ['Harvey Barnes', "Jake O'Brien"]); // el tiro libre es del que recibió la falta
   const wins = json.commentary.filter((c) => /wins a free kick/i.test(c.text ?? c.play?.text ?? '')).length;
   assert.equal(plays.filter((p) => p.kind === 'free-kick').length, wins);
 });
