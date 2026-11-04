@@ -164,3 +164,14 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px
 /* Mejores apuestas */
 .pk-game + .pk-game { margin-top: 12px; }
 .pk-game h2 { font-size: 16px; margin: 0 0 4px; }
+
+/* Mejores apuestas: registro de Oddsy */
+.pk-list, .pk-totals { list-style: none; padding: 0; margin: 0 0 12px; }
+.pk-list li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.pk-list small { display: block; color: var(--muted); }
+.pk-mark { display: inline-block; width: 1.2em; font-weight: 700; color: var(--muted); }
+.pk-ganada .pk-mark { color: var(--pos); }
+.pk-perdida .pk-mark { color: var(--err); }
+.pk-star { color: var(--mint); }
+.pk-record details { margin-top: 8px; }
+.pk-record summary { cursor: pointer; color: var(--teal); }

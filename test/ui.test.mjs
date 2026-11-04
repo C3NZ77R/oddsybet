@@ -239,3 +239,63 @@ test('PWA: el servidor sirve el manifiesto con su tipo', async () => {
   await handler({ url: '/manifest.webmanifest', method: 'GET' }, { writeHead(s, h) { headers = h; return this; }, end() {} });
   assert.equal(headers['content-type'], 'application/manifest+json');
 });
+
+// ---------- registro de picks en Mejores apuestas ----------
+const REC = {
+  since: '2026-10-20',
+  day: { date: '2026-11-02', yesterday: true, picks: [
+    ...Array.from({ length: 7 }, () => ({ home: 'Millonarios', away: 'Nacional', market: 'dc', label: 'Doble oportunidad', name: 'Local o empate', line: null, p: 0.78, status: 'ganada', score: '2-1', reason: null })),
+    ...Array.from({ length: 3 }, () => ({ home: 'Junior', away: 'Santa Fe', market: 'ou', label: 'Total de goles 2.5', name: 'Más', line: 2.5, p: 0.66, status: 'perdida', score: '1-0', reason: 'Se perdió por poco (por 2 goles)' })),
+  ] },
+  windows: [{ days: 7, won: 31, lost: 9, voided: 1, promised: 0.76, hit: 0.775 }, { days: 30, won: 120, lost: 34, voided: 2, promised: 0.75, hit: 0.779 }],
+  all: { days: 30, won: 400, lost: 190, promised: 0.68, hit: 0.678 },
+  markets: [{ market: 'dc', n: 300, promised: 0.77, hit: 0.8 }, { market: 'ou', n: 200, promised: 0.6, hit: 0.52 }],
+  model: { at: '2026-11-03T09:20:00Z', status: 'en_uso', n: 5000, nTest: 600, llBase: 0.62, llModel: 0.6 },
+};
+
+test('registro: la tarjeta muestra ayer 7 de 10, cada pick con ✓/✗ y la razón, y lo prometido contra lo que salió', async () => {
+  const { recordHtml } = await import('../public/views/picks.js');
+  const s = String(recordHtml(REC));
+  assert.match(s, /Ayer · 7 de 10/);
+  assert.match(s, /Millonarios o empate/);
+  assert.equal((s.match(/✗/g) ?? []).length, 3);
+  assert.match(s, /Se perdió por poco \(por 2 goles\)/);
+  assert.match(s, /Últimos 7 días: <b>31 de 40<\/b> \(78%\) · Oddsy prometía 76%/);
+  assert.match(s, /Doble oportunidad/);
+  assert.match(s, /en uso/);
+  assert.equal(String(recordHtml(null)), '');
+  assert.match(String(recordHtml({ ...REC, day: null, windows: REC.windows.map((w) => ({ ...w, won: 0, lost: 0 })), all: { won: 0, lost: 0 }, markets: [], since: '2026-11-03' })), /El registro empezó el 3 (de )?nov/);
+  assert.match(String(recordHtml({ since: null, day: null, windows: [], all: { won: 0, lost: 0 }, markets: [], model: null })), /El registro empieza/);
+  assert.match(String(recordHtml({ ...REC, day: { ...REC.day, yesterday: false } })), /2 (de )?nov · 7 de 10/);
+});
+
+test('registro: la vista pone la tarjeta y la ★; un pick bajo 50 % no se muestra; si /api/record falla, los picks salen igual', async () => {
+  const { default: view } = await import('../public/views/picks.js');
+  const game = { id: 'g1', start: '2099-01-01T00:00:00Z', status: { state: 'pre' }, home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
+  const picks = [{ market: 'dc', label: 'Doble oportunidad', name: 'Local o empate', p: 0.8, minOdds: 1.32, featured: true }, { market: 'ml', name: 'Local', p: 0.45, raw: 0.55, minOdds: 2.4 }];
+  const api = (record) => ({
+    games: async () => ({ data: [game] }),
+    get: async (path) => (path === '/api/record' ? record() : { accuracy: { publish: true }, data: [{ gameId: 'g1', picks }] }),
+  });
+  const el = {};
+  await view.render(el, { api: api(async () => ({ data: REC })), leagueInfo: { id: 'colombia', title: 'Liga BetPlay' } });
+  const s = String(el.innerHTML);
+  assert.match(s, /Ayer · 7 de 10/);
+  assert.match(s, /★/);
+  assert.match(s, /Pick del partido/);
+  assert.doesNotMatch(s, /Gana Millonarios/); // el de 45 % no se muestra
+  const el2 = {};
+  await view.render(el2, { api: api(async () => { throw new Error('caído'); }), leagueInfo: { id: 'colombia', title: 'Liga BetPlay' } });
+  assert.match(String(el2.innerHTML), /Millonarios o empate/);
+  assert.doesNotMatch(String(el2.innerHTML), /Registro de Oddsy|Ayer ·/);
+});
+
+test('registro: dayText pone primero los picks del partido y agrega cómo le fue ayer', async () => {
+  const { dayText } = await import('../public/views/picks.js');
+  const g = { home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
+  const rows = [[g, [{ market: '1x2', name: 'Local', p: 0.9, minOdds: 1.2 }, { market: 'dc', name: 'Local o empate', p: 0.72, minOdds: 1.5, featured: true }]]];
+  const t = dayText('Liga BetPlay', rows, 8, REC);
+  assert.ok(t.indexOf('Millonarios o empate') < t.indexOf('Gana Millonarios'));
+  assert.match(t, /★ Millonarios vs Nacional/);
+  assert.match(t, /Ayer: 7 de 10 · últimos 30 días: 78%/);
+});
