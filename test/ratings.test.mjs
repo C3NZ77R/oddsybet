@@ -287,7 +287,6 @@ test('getSeasonResults: con pocos partidos suma la temporada anterior, quita dup
     const res = await getSeasonResults('nba');
     assert.equal(res.length, 1 + 1 + 24);
     assert.equal(new Set(res.map((r) => r.id)).size, res.length);
-    assert.deepEqual(res.filter((r) => r.cur).map((r) => r.id), ['s1']); // solo la temporada vigente lleva cur
     assert.ok(urls.some((u) => u.endsWith('/teams/1/schedule?season=2026')));
     assert.ok(!urls.some((u) => u.includes('seasontype') || u.includes('../x')));
     const n = urls.length;
@@ -420,12 +419,15 @@ test('bajas: absentValue solo cuenta jugadores de rotación que jugaron hace poc
   assert.equal(absentValue(played, later, cfg), 0); // fuera hace más de 20 partidos del equipo: ya está en los ratings
 });
 
-test('ratingsFromResults: gpNow cuenta solo la temporada vigente (cur) antes del corte', () => {
-  const r = (i, cur) => ({ id: `g${i}`, date: new Date(Date.UTC(2026, 9, 1 + i)).toISOString(), homeId: 'A', awayId: 'B', homeScore: 2, awayScore: 1, ...(cur && { cur: true }) });
-  const rs = [...[0, 1, 2, 3, 4].map((i) => r(i, false)), ...[5, 6, 7].map((i) => r(i, true))];
-  const all = ratingsFromResults(rs, { sport: 'soccer' });
+test('ratingsFromResults: gpNow cuenta los partidos desde el último parón de 45 días antes del corte', () => {
+  const day = (m, d) => new Date(Date.UTC(2026, m, d)).toISOString();
+  const r = (i, date) => ({ id: `g${i}`, date, homeId: 'A', awayId: 'B', homeScore: 2, awayScore: 1 });
+  // 5 partidos en marzo-abril (temporada pasada), parón de 4 meses y 3 en septiembre.
+  const rs = [...[1, 8, 15, 22, 29].map((d, i) => r(i, day(2, d))), ...[2, 9, 16].map((d, i) => r(10 + i, day(8, d)))];
+  const all = ratingsFromResults(rs, { sport: 'soccer', now: Date.UTC(2026, 8, 20) });
   assert.equal(all.teams.get('A').gp, 8);
   assert.equal(all.teams.get('A').gpNow, 3);
-  const cut = ratingsFromResults(rs, { sport: 'soccer', asOf: Date.UTC(2026, 9, 7) }); // antes del 2.º partido cur
-  assert.equal(cut.teams.get('B').gpNow, 1);
+  assert.equal(ratingsFromResults(rs, { sport: 'soccer', asOf: Date.UTC(2026, 8, 10) }).teams.get('B').gpNow, 2); // antes del 3.º
+  assert.equal(ratingsFromResults(rs, { sport: 'soccer', asOf: Date.UTC(2026, 7, 30) }).teams.get('B').gpNow, 0); // nada desde el parón
+  assert.equal(ratingsFromResults(rs, { sport: 'soccer', asOf: Date.UTC(2026, 3, 2) }).teams.get('B').gpNow, 5); // dentro de la temporada pasada
 });

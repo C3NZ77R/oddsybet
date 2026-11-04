@@ -227,3 +227,28 @@ test('registro: sin filas → since null y sin día; un día de hace más de 7 d
   assert.equal(old.since, '2026-10-20');
   assert.equal(dayOf(Date.parse('2026-11-03T03:00:00Z')), '2026-11-02'); // 22:00 del 2 nov en Colombia
 });
+
+// ---------- lo que encontró la revisión ----------
+test('revisión: un partido aplazado (nula) que ESPN reprograma con el mismo id vuelve a pendiente al congelarse', async () => {
+  const db = memDb(done);
+  await db.upsertPicks([{ id: 'colombia:a:dc', source: 'live', league: 'colombia', gameId: 'a', status: 'nula', reason: 'Partido aplazado o cancelado', score: null, margin: null, settledAt: 'x' }]);
+  const board = { [TODAY]: [game('a', NOW + 2 * 3_600_000)] };
+  await runTick(deps(db, { board, picks: { [TODAY]: [{ gameId: 'a', x: {}, picks: [pk('dc', 0.8)] }] } }), { now: NOW });
+  const r = db.rows.get('colombia:a:dc');
+  assert.deepEqual([r.status, r.reason, r.settledAt, r.p], ['pendiente', null, null, 0.8]);
+});
+
+test('revisión: si ESPN falla al cerrar, nada se anula aunque pasen los 3 días; se reintenta', async () => {
+  const db = memDb(done);
+  await db.upsertPicks([{ id: 'colombia:c:dc', source: 'live', league: 'colombia', sport: 'soccer', gameId: 'c', espnDate: '20261030', market: 'dc', side: 0, line: null,
+    p: 0.8, x: {}, gameStart: new Date(NOW - 4 * 86_400_000).toISOString(), status: 'pendiente' }]);
+  const out = await runTick({ ...deps(db), results: async () => { throw new Error('ESPN respondió 403'); } }, { now: NOW });
+  assert.equal(out.settled, 0);
+  assert.equal(db.rows.get('colombia:c:dc').status, 'pendiente');
+});
+
+test('revisión: un partido sin marcador no muestra "null-null"', () => {
+  assert.equal(scoreOf({ home: null, away: null, name: 'STATUS_CANCELED' }), null);
+  assert.equal(scoreOf({ sets: [] }), null);
+  assert.equal(gradePick({ sport: 'soccer', market: 'dc', side: 0 }, { home: null, away: null, name: 'STATUS_CANCELED' }).status, 'nula');
+});

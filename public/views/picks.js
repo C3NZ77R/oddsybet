@@ -10,6 +10,8 @@ const HCP = { spread: 'hándicap', games_hcp: 'hándicap de games' };
 const pickText = (p, g) => named(HCP[p.market] ? `${p.name} ${signed(p.line)} (${HCP[p.market]})`
   : p.market === '1x2' || p.market === 'ml' ? (p.name === 'Empate' ? 'Empate' : `Gana ${p.name}`)
     : `${p.label}: ${p.name}`, g);
+const RECORD_WAIT_MS = 1500;
+const LATE = Symbol('tarde');
 const recordText = (r) => (r ? h`${fmtPct(r.hit, 0)} <small>de ${r.n}</small>` : "—");
 const star = (p) => (p.featured ? h`<span class="pk-star" aria-label="Pick del partido">★</span> ` : '');
 
@@ -81,18 +83,27 @@ export default {
     const failed = [];
     const safe = (p) => p.catch((err) => (failed.push(err), { data: [] }));
     const pending = Promise.all(days.map((d) => Promise.all([safe(api.games(lg.id, d)), safe(api.get('/api/picks', { league: lg.id, date: d }))])));
-    // El registro va aparte: si falla, los picks salen igual y la tarjeta no aparece.
-    const [res, record] = await Promise.all([pending, api.get('/api/record', { league: lg.id }).then((r) => r?.data ?? null, () => null)]);
+    // El registro va aparte: si falla, los picks salen igual sin la tarjeta; si tarda más de RECORD_WAIT_MS, llega después.
+    const recordP = api.get('/api/record', { league: lg.id }).then((r) => r?.data ?? null, () => null);
+    let timer;
+    const late = new Promise((r) => { timer = setTimeout(r, RECORD_WAIT_MS, LATE); });
+    const [res, first] = await Promise.all([pending, Promise.race([recordP, late])]).finally(() => clearTimeout(timer));
+    let record = first === LATE ? null : first;
     if (failed.length === days.length * 2) throw failed[0];
     const games = new Map(res.flatMap(([gs]) => gs.data ?? []).map((g) => [g.id, g]));
     const acc = res.map(([, pk]) => pk.accuracy).find(Boolean); // la del primer día que respondió
     // Llegan también los picks que lo aprendido dejó bajo el 50 % (el registro los guarda); aquí no se muestran.
     const rows = res.flatMap(([, pk]) => pk.data ?? []).map((x) => [games.get(x.gameId), x.picks.filter((p) => p.p >= 0.5)])
       .filter(([g, ps]) => g?.status?.state === 'pre' && ps.length).sort(([a], [b]) => a.start.localeCompare(b.start));
-    el.innerHTML = h`${recordHtml(record)}<header class="view-head"><div><h1>Mejores apuestas · ${lg.title}</h1>
+    el.innerHTML = h`<div data-record>${recordHtml(record)}</div><header class="view-head"><div><h1>Mejores apuestas · ${lg.title}</h1>
       <p class="hint">Las apuestas más probables de cada partido según Oddsy, para hoy y los próximos dos días. Apuesta solo si tu casa paga <b>la cuota mínima o más</b>. Si paga menos, a la larga pierdes plata aunque aciertes seguido. «Se cumplió» dice cuántas veces acertó ese tipo de apuesta en la temporada pasada, en partidos que Oddsy no había visto antes.</p></div></header>
       ${acc?.publish === false ? empty('Todavía no mostramos apuestas en esta liga: Oddsy aún no predice mejor que usar los resultados de la temporada pasada.')
         : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps]) => gameCard(g, ps))}` : empty('No hay partidos próximos con apuestas de 50% o más.')}`;
     el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, 8, record))}`, '_blank', 'noopener'));
+    // Si se cambió de vista mientras tanto, el hueco ya no está en la página y no se toca nada.
+    if (first === LATE) recordP.then((rec) => {
+      const slot = el.querySelector?.('[data-record]');
+      if (rec && slot?.isConnected) (record = rec), (slot.innerHTML = String(recordHtml(rec)));
+    });
   },
 };

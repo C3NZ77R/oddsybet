@@ -299,3 +299,15 @@ test('registro: dayText pone primero los picks del partido y agrega cómo le fue
   assert.match(t, /★ Millonarios vs Nacional/);
   assert.match(t, /Ayer: 7 de 10 · últimos 30 días: 78%/);
 });
+
+test('registro: si /api/record tarda, los picks salen igual (sin esperarlo más de 1.5 s)', async () => {
+  const { default: view } = await import('../public/views/picks.js');
+  const game = { id: 'g1', start: '2099-01-01T00:00:00Z', status: { state: 'pre' }, home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
+  const api = { games: async () => ({ data: [game] }), get: async (path) => (path === '/api/record' ? new Promise(() => {}) : { accuracy: { publish: true }, data: [{ gameId: 'g1', picks: [{ market: 'ml', name: 'Local', p: 0.6, minOdds: 1.8 }] }] }) };
+  const el = {};
+  const t0 = Date.now();
+  await view.render(el, { api, leagueInfo: { id: 'colombia', title: 'Liga BetPlay' } });
+  assert.ok(Date.now() - t0 < 2500);
+  assert.match(String(el.innerHTML), /Gana Millonarios/);
+  assert.doesNotMatch(String(el.innerHTML), /Registro de Oddsy/);
+});

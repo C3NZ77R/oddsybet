@@ -268,7 +268,7 @@ test('mercados: un partido terminado se cotiza con los ratings de antes de jugar
     assert.ok(results.some((r) => r.id === 'g'));
     const p = (opts) => sel(pick(marketsFor('soccer', expected('soccer', ratingsFromResults(results, { sport: 'soccer', ...opts }), '1', '2')), '1x2'), 'Local').p;
     const list = await getMarkets('laliga', { date: '20260411' });
-    assert.deepEqual(list.data[0].x, { few: 0.4, abs: 0 }); // 6 partidos de la temporada antes del corte: 1 − 6/10
+    assert.deepEqual(list.data[0].x, { few: 0.4, abs: 0 }); // 6 partidos sin parón antes del corte: 1 − 6/10
     const local = sel(pick(list.data[0].markets, '1x2'), 'Local').p;
     close(local, p({ asOf: Date.parse(g.date) }), 1e-4);
     assert.ok(p({}) - local > 0.01, 'sin su propio 5-1');
@@ -363,12 +363,13 @@ test('mejores apuestas: getPicks marca el pick del partido (≥ 70 %) y devuelve
   let k = 0;
   for (const h of ids) for (const a of ids) if (h !== a) events.push(ev(`r${k}`, day(k++), h, a, h === '1' ? 3 : 1, a === '1' ? 2 : 1));
   const g = ev('g', '2026-04-11T19:00:00.000Z', '1', '2', 0, 0, 'pre');
-  const shift = (c) => ({ sports: { soccer: { status: 'en_uso', leagues: { laliga: c } } } });
-  await withEspn(leagueRoute('esp.1', events, [g]), async () => {
-    const plain = (await getPicks('laliga', { date: '20260411' })).data[0];
-    assert.deepEqual(plain.x, { few: 0.4, abs: 0 });
+  const shift = (c) => ({ sports: { soccer: { status: 'en_uso', leagues: { libertadores: c } } } });
+  // Liga propia: la caché de ratings (30 min) es por liga y otro test ya calculó la de LaLiga.
+  await withEspn(leagueRoute('conmebol.libertadores', events, [g]), async () => {
+    const plain = (await getPicks('libertadores', { date: '20260411' })).data[0];
+    assert.deepEqual(plain.x, { few: 1, abs: 0 }); // en pre, contra hoy: el último partido de la liga fue hace meses
     for (const [c, featured] of [[1, true], [-1, false]]) {
-      const { picks } = (await getPicks('laliga', { date: '20260411', model: shift(c) })).data[0];
+      const { picks } = (await getPicks('libertadores', { date: '20260411', model: shift(c) })).data[0];
       assert.equal(Boolean(picks[0].featured), featured, `c = ${c}: ${picks[0].p}`);
       assert.ok(picks.slice(1).every((p) => !p.featured));
       for (let i = 1; i < picks.length; i++) assert.ok(picks[i].p <= picks[i - 1].p);
