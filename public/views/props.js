@@ -4,6 +4,7 @@ import * as bm from '../betmath.js';
 import * as S from '../stats.js';
 import { leagueById } from '../leagues.js';
 import * as ui from '../ui.js';
+import * as B from '../betano.js';
 
 const PAGE = 50;
 const CONCURRENCY = 4;
@@ -172,6 +173,26 @@ function mount(el) {
   return () => el.isConnected;
 }
 
+// --- líneas de Betano ---
+const BIG_EDGE = 0.15;
+const BT_NOTE = 'Betano: su cuota y la ventaja (probabilidad Oddsy × cuota − 1). Arriba de 15 % suele ser algo que Oddsy no sabe (lesiones, minutos): revísalo antes de apostar.';
+const edgeHtml = (e, tag = 'small') => `<${tag} class="${e > BIG_EDGE ? 'pp-ev-big' : e > 0 ? 'pos' : 'pp-na'}">${e > 0 ? '+' : ''}${Math.round(e * 100)} %</${tag}>`;
+function btCell(p) {
+  const e = B.edge(p.p, p.betano);
+  return e == null ? '<span class="pp-na">—</span>' : `${esc(ui.fmtOdds(p.betano))} ${edgeHtml(e)}`;
+}
+const ago = (at) => { const m = Math.round((Date.now() - at) / 60000); return m < 1 ? 'hace un momento' : m < 90 ? `hace ${m} min` : `hace ${Math.round(m / 60)} h`; };
+// Menú "Betano" de la lista: estado de las líneas y cómo instalar el marcador que las trae.
+function betanoHtml(store) {
+  const b = B.saved(store), n = b ? Object.keys(b.lines).length : 0;
+  return `${n ? `<p>Tienes ${n} líneas de Betano, traídas ${ago(b.at)}. <button type="button" class="pp-link" data-act="btclear">Borrarlas</button></p>` : '<p class="pp-muted">Todavía no has traído líneas de Betano.</p>'}
+    <p>Con el marcador "Oddsy ← Betano", cada prop usa la línea exacta de Betano y muestra su cuota. Se instala una vez; después, en betano.co, abres la página de la NBA (trae todos los partidos) o un partido y lo tocas.</p>
+    <p>En el computador, arrastra este botón a la barra de marcadores: <a class="pp-btn" href="${esc(B.bookmarklet(location.origin))}" data-act="btlink">Oddsy ← Betano</a></p>
+    <p>En el celular: <button type="button" class="pp-btn" data-act="btcopy">Copiar el código</button></p>
+    <ol class="pp-steps"><li>En Chrome, guarda cualquier página como favorito (la estrella del menú ⋮) y edítalo.</li><li>Ponle de nombre oddsy, borra la URL y pega el código.</li><li>En Betano, toca la barra de direcciones, escribe oddsy y toca el favorito.</li></ol>
+    <p class="pp-muted">En iPhone es igual en Safari y se abre desde Favoritos. Dentro de la app de Betano no funciona: abre betano.co en el navegador.</p>`;
+}
+
 // ======================= LISTA =======================
 const memory = {}; // filtros por liga mientras dure la pestaña
 const defaults = () => ({ stats: [], players: [], games: [], side: 'all', minOdds: '', maxOdds: '', minHit: '', hitWin: 'l10', matchup: [], sort: 'l10', dir: 'desc' });
@@ -188,11 +209,16 @@ async function renderList(el, ctx) {
   const props = pr.error ? [] : (dataOf(pr) ?? []).filter((p) => p?.books?.length && Number.isFinite(p.line));
   const gamesById = new Map((dataOf(gr) ?? []).map((g) => [String(g.id), g]));
   const rowMap = new Map();
-  for (const p of props) {
+  const bt = league === 'nba' ? B.saved(store) : null;
+  for (const p0 of props) {
+    // Con línea de Betano, el prop pasa a esa línea y lleva su cuota (docs/superpowers/specs/2026-11-04-lineas-betano-design.md).
+    const b = Number.isFinite(p0.variance) ? B.lineFor(bt, p0.player, p0.stat) : null;
+    const p = b ? { ...B.atLine(p0, b[0]), betano: p0.side === 'Over' ? b[1] : b[2] } : p0;
     const key = propKey(p);
     if (!rowMap.has(key)) rowMap.set(key, { p, key, who: who(p), def: defOf(sport, p.stat, p.market), price: oddsy(p).price });
   }
   const rows = [...rowMap.values()];
+  const hasBt = rows.some((r) => r.p.betano != null);
   const f = (memory[league] ??= defaults());
   const presets = () => store.get('presets').props ?? [];
   const savePresets = (list) => store.set('presets', { ...store.get('presets'), props: list });
@@ -233,7 +259,7 @@ async function renderList(el, ctx) {
       return true;
     });
   }
-  const SORT = { player: (r) => r.p.player, line: (r) => r.p.line, p: (r) => r.p.p, fair: (r) => r.p.fair, odds: (r) => r.price, opp: (r) => matchupOf(r)?.rank ?? null };
+  const SORT = { player: (r) => r.p.player, line: (r) => r.p.line, p: (r) => r.p.p, fair: (r) => r.p.fair, odds: (r) => r.price, ev: (r) => B.edge(r.p.p, r.p.betano), opp: (r) => matchupOf(r)?.rank ?? null };
   for (const w of WINS) SORT[w] = (r) => hits(r)?.[w]?.pct ?? null;
   function sorted(list) {
     const fn = SORT[f.sort] ?? SORT.l10, dir = f.dir === 'asc' ? 1 : -1;
@@ -258,12 +284,12 @@ async function renderList(el, ctx) {
     const h = hits(r), on = inSlip(store, r.key);
     return `<td><button type="button" class="pp-add" data-act="add" data-k="${esc(r.key)}" aria-pressed="${on}" aria-label="${on ? 'Quitar del' : 'Agregar al'} boleto: ${esc(`${r.p.player} ${propText(r.p.side, r.p.line, r.def, r.p.stat)}`)}">${on ? '✓' : '+'}</button></td>
       <td class="pp-c-prop">${propCell(r)}</td><td class="pp-num">${fmtLine(r.p.line)}</td>
-      <td class="pp-num">${esc(ui.fmtPct(r.p.p, 1))}</td><td class="pp-num">${esc(ui.fmtOdds(r.p.fair))}</td><td class="pp-num"><b>${esc(ui.fmtOdds(r.price))}</b></td><td>${oppCell(r)}</td>
+      <td class="pp-num">${esc(ui.fmtPct(r.p.p, 1))}</td><td class="pp-num">${esc(ui.fmtOdds(r.p.fair))}</td><td class="pp-num"><b>${esc(ui.fmtOdds(r.price))}</b></td>${hasBt ? `<td class="pp-num">${btCell(r.p)}</td>` : ''}<td>${oppCell(r)}</td>
       ${WINS.map((w) => `<td class="pp-num">${hrCell(h === undefined ? undefined : h?.[w] ?? null)}</td>`).join('')}`;
   }
   const rowHtml = (r) => `<tr data-k="${esc(r.key)}" data-a="${esc(r.p.athleteId ?? '')}" data-g="${esc(r.p.gameId ?? '')}">${rowInner(r)}</tr>`;
   function head() {
-    const cols = [['player', 'Jugador'], ['line', 'Línea', 'Línea Oddsy: el valor del medio en sus últimos 20 partidos'], ['p', 'Prob.', 'Probabilidad según Oddsy'], ['fair', 'Justa', 'Cuota sin margen: 1 dividido por la probabilidad'], ['odds', 'Oddsy', 'Cuota Oddsy, con un margen del 5 %'], ['opp', 'Defensa rival', 'Puesto de la defensa rival en esa estadística (1 = la que menos permite)'], ...WINS.map((w) => [w, ...WIN_HEAD[w]])];
+    const cols = [['player', 'Jugador'], ['line', 'Línea', hasBt ? 'La de Betano cuando la trajiste; si no, la línea Oddsy' : 'Línea Oddsy: el valor del medio en sus últimos 20 partidos'], ['p', 'Prob.', 'Probabilidad según Oddsy'], ['fair', 'Justa', 'Cuota sin margen: 1 dividido por la probabilidad'], ['odds', 'Oddsy', 'Cuota Oddsy, con un margen del 5 %'], ...(hasBt ? [['ev', 'Betano', 'Cuota de Betano y la ventaja con la probabilidad de Oddsy']] : []), ['opp', 'Defensa rival', 'Puesto de la defensa rival en esa estadística (1 = la que menos permite)'], ...WINS.map((w) => [w, ...WIN_HEAD[w]])];
     return `<tr><th scope="col"><span class="sr-only">Boleto</span></th>${cols.map(([k, label, title]) => {
       const on = f.sort === k;
       return `<th scope="col" aria-sort="${on ? (f.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" class="pp-sort" data-act="sort" data-sort="${k}"${title ? ` title="${esc(title)}"` : ''}>${esc(label)}${on ? (f.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button></th>`;
@@ -280,7 +306,7 @@ async function renderList(el, ctx) {
     }
     const page = vis.slice(0, shown);
     box.innerHTML = vis.length
-      ? `<div class="pp-scroll"><table class="pp-table"><thead>${head()}</thead><tbody>${page.map(rowHtml).join('')}</tbody></table></div>${vis.length > shown ? `<button type="button" class="pp-more" data-act="more">Ver más (${vis.length - shown} restantes)</button>` : ''}`
+      ? `<div class="pp-scroll"><table class="pp-table"><thead>${head()}</thead><tbody>${page.map(rowHtml).join('')}</tbody></table></div>${vis.length > shown ? `<button type="button" class="pp-more" data-act="more">Ver más (${vis.length - shown} restantes)</button>` : ''}${hasBt ? `<p class="pp-muted">${BT_NOTE}</p>` : ''}`
       : str(ui.empty('Ningún prop cumple estos filtros.'));
     // Primero los partidos (rival y defensa), luego los historiales de las filas visibles y después el resto.
     const ids = (list, pick) => [...new Set(list.map(pick).filter((x) => x != null))];
@@ -350,6 +376,7 @@ async function renderList(el, ctx) {
       ${dd('odds', 'Cuotas', `<p class="pp-muted">Escribe el rango en formato americano, por ejemplo de −300 a +200.</p><div class="pp-row"><label class="pp-field">Mínima <input type="number" step="5" data-f="minOdds" value="${esc(f.minOdds)}" placeholder="-300"></label><label class="pp-field">Máxima <input type="number" step="5" data-f="maxOdds" value="${esc(f.maxOdds)}" placeholder="200"></label></div>`)}
       ${dd('hit', 'Acierto', `<div class="pp-row"><label class="pp-field">Mínimo % <input type="number" min="0" max="100" step="5" data-f="minHit" value="${esc(f.minHit)}" placeholder="60"></label><label class="pp-field">Periodo <select data-f="hitWin">${winOpts}</select></label></div>`)}
       ${dd('matchup', 'Defensa rival', `${Object.entries(MATCHUP).map(([k, label]) => check('matchup', k, `<i class="pp-dot pp-${k}"></i>${label}`, f.matchup.includes(k))).join('')}<p class="pp-muted">Según el puesto de la defensa rival en esa estadística. Solo aparece cuando ESPN publica ese ranking.</p>`)}
+      ${league === 'nba' ? dd('betano', 'Betano', betanoHtml(store), 'pp-wide') : ''}
       <button type="button" class="pp-link" data-act="reset">Limpiar</button>
       <span class="pp-count" data-count role="status"></span>
     </div>`;
@@ -385,6 +412,11 @@ async function renderList(el, ctx) {
       t.closest('.pp-pop').innerHTML = presetsHtml();
     } else if (act === 'load') { Object.assign(f, defaults(), presets()[t.dataset.i]?.f); paintBar(); refresh(); }
     else if (act === 'del') { savePresets(presets().filter((_, i) => i !== Number(t.dataset.i))); t.closest('.pp-pop').innerHTML = presetsHtml(); }
+    else if (act === 'btlink') e.preventDefault(); // se arrastra a los marcadores; aquí no hace nada
+    else if (act === 'btcopy') {
+      const code = B.bookmarklet(location.origin);
+      navigator.clipboard.writeText(code).then(() => { t.textContent = 'Código copiado'; }, () => window.prompt('Copia este código:', code));
+    } else if (act === 'btclear') { store.set('betano', null); ctx.navigate(location.hash); }
   });
   root.addEventListener('change', (e) => {
     const t = e.target.closest('[data-f]');
@@ -451,13 +483,12 @@ async function renderDetail(el, ctx) {
     const own = mine.find((p) => p.stat === stat && p.line === line && p.side === side);
     if (own) return own;
     const base = mine.find((p) => p.stat === stat && Number.isFinite(p.variance));
-    if (!base || !Number.isFinite(line)) return null;
-    const over = bm.propOver(base.kind, base.mean, base.variance, line);
-    const pr = bm.price(side === 'Over' ? over : 1 - over);
-    return { ...base, line, side, p: pr.p, fair: pr.fair, books: [{ key: 'oddsy', title: 'Oddsy', price: pr.oddsy }] };
+    return base && Number.isFinite(line) ? B.atLine(base, line, side) : null;
   };
   const lineOf = (stat) => mine.find((p) => p.stat === stat)?.line ?? null;
-  const defaultLine = (stat) => lineOf(stat) ?? (S.STATS[sport]?.find((d) => d.key === stat)?.binary ? 0.5 : medianLine(valsOf(games, sport, stat), stat)); // 0/1 por partido
+  const bt = league === 'nba' ? B.saved(store) : null;
+  const btOf = (stat) => B.lineFor(bt, pk.player, stat); // [línea, cuota Más, cuota Menos] de Betano
+  const defaultLine = (stat) => btOf(stat)?.[0] ?? lineOf(stat) ?? (S.STATS[sport]?.find((d) => d.key === stat)?.binary ? 0.5 : medianLine(valsOf(games, sport, stat), stat)); // 0/1 por partido
   const minutesMax = Math.ceil(Math.max(0, ...games.map((g) => g.minutes).filter(Number.isFinite)));
   const s = { stat: k.stat ?? statsHere[0]?.key ?? defs[0]?.key, line: k.line, side: k.side, win: 'l10', loc: 'all', rest: 'all', result: 'all', margin: 20, minMin: 0, mate: '', mateMode: 'with', tab: 'matchup' };
   if (!Number.isFinite(s.line)) s.line = defaultLine(s.stat);
@@ -503,6 +534,14 @@ async function renderDetail(el, ctx) {
   const root = el.firstElementChild;
 
   const addText = (on, sel) => (on ? '✓ En el boleto' : `+ Agregar ${ui.fmtOdds(oddsy(sel).price)}`);
+  // Línea y cuotas de Betano; en su línea, la ventaja del lado elegido.
+  function btLine(sel) {
+    const b = btOf(s.stat);
+    if (!b) return '';
+    const e = b[0] === s.line ? B.edge(sel?.p, s.side === 'Over' ? b[1] : b[2]) : null;
+    return `<p class="pp-avg">Línea Betano <b>${esc(fmtLine(b[0]))}</b> · Más ${esc(ui.fmtOdds(b[1]))} · Menos ${esc(ui.fmtOdds(b[2]))}${b[0] !== s.line ? ` <button type="button" class="pp-link" data-act="btline">Usar la línea de Betano</button>`
+      : e != null ? ` · Ventaja ${edgeHtml(e, 'b')}` : ''}</p>${e > BIG_EDGE ? `<p class="pp-muted">${BT_NOTE}</p>` : ''}`;
+  }
   function hctl() {
     const d = def(), over = propFor(s.stat, s.line, 'Over'), under = propFor(s.stat, s.line, 'Under');
     const sel = s.side === 'Over' ? over : under, on = inSlip(store, keyNow()), ours = lineOf(s.stat);
@@ -514,6 +553,7 @@ async function renderDetail(el, ctx) {
       <div class="pp-seg pp-sides" role="group" aria-label="Lado">${sideBtn('Over', over)}${sideBtn('Under', under)}</div>
       ${ours == null ? `<p class="pp-muted">${esc(why)}</p>`
         : `<p class="pp-avg">Línea Oddsy <b>${esc(fmtLine(ours))}</b>${ours !== s.line ? ` <button type="button" class="pp-link" data-act="ourline">Volver a la línea Oddsy</button>` : ''}</p>`}
+      ${btLine(sel)}
       ${sel ? `<p class="pp-avg">Prob. <b>${esc(ui.fmtPct(sel.p, 1))}</b> · Justa <b>${esc(ui.fmtOdds(sel.fair))}</b> · Oddsy <b>${esc(ui.fmtOdds(oddsy(sel).price))}</b> ${str(ui.sourceBadge('oddsy'))}</p>
         <div class="pp-addbox"><button type="button" class="pp-btn" data-act="addbest" aria-pressed="${on}">${esc(addText(on, sel))}</button></div>`
         : ''}`;
@@ -625,9 +665,10 @@ async function renderDetail(el, ctx) {
       const p = propFor(s.stat, s.line, s.side);
       if (p) togglePick(ctx, keyNow(), `${pk.player} · ${propText(s.side, s.line, def(), s.stat)}`, oddsy(p), gameId);
       return; // el oyente de picks actualiza el botón sin redibujar
-    } else if (t.dataset.act === 'ourline') {
-      if (lineOf(s.stat) == null) return;
-      s.line = lineOf(s.stat);
+    } else if (t.dataset.act === 'ourline' || t.dataset.act === 'btline') {
+      const line = t.dataset.act === 'ourline' ? lineOf(s.stat) : btOf(s.stat)?.[0];
+      if (line == null) return;
+      s.line = line;
     } else if (t.dataset.act === 'freset') {
       Object.assign(s, { rest: 'all', result: 'all', margin: 20, minMin: 0, mate: '', mateMode: 'with' });
       for (const x of root.querySelectorAll('.pp-filters [data-s]')) x.value = s[x.dataset.s];

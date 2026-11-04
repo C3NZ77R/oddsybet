@@ -4,6 +4,7 @@ import { store, encodePicks, decodePicks } from './store.js';
 import { ui, h, empty, fmtOdds, fmtPct, bookInfo, bookChip, raw } from './ui.js';
 import { LEAGUES, leagueById } from './leagues.js';
 import { parlayOdds } from './betmath.js';
+import { decode as decodeBetano, save as saveBetano } from './betano.js';
 
 const $ = (s) => document.querySelector(s);
 const LEAGUE_VIEWS = ['props', 'games', 'live', 'picks', 'insights', 'popular', 'seguir'];
@@ -22,6 +23,7 @@ function parse(hash) {
   const query = new URLSearchParams(qs);
   const r = (name, league = null, id) => ({ name, league, params: id != null ? { id } : {}, query });
   if (seg[0] === 'share' && seg.length === 1) return r('share');
+  if (seg[0] === 'betano' && seg.length === 1) return r('betano');
   if (seg[0] === 'tennis-rankings' && seg.length === 1) return r('tennis-rankings');
   if (seg[0] === 'tennis-player' && seg.length === 2) return r('tennis-player', null, seg[1]);
   const lg = leagueById(seg[0]);
@@ -48,6 +50,7 @@ async function route() {
   const r = parse(location.hash);
   if (!r) return location.replace(defaultHash());
   if (r.name === 'share') return importShare(r.query);
+  if (r.name === 'betano') return importBetano(r.query);
   const my = ++seq;
   runCleanup();
   if (r.league && r.league.id !== store.get('league')) store.set('league', r.league.id);
@@ -123,6 +126,15 @@ function importShare(query) {
     : 'Este enlace no tiene picks válidos.');
   if (incoming.length) openSlip();
   location.replace(defaultHash());
+}
+
+// ---------- líneas de Betano (las trae el marcador de public/betano.js) ----------
+async function importBetano(query) {
+  const lines = await decodeBetano(query.get('d'));
+  const n = Object.keys(lines).length, players = new Set(Object.keys(lines).map((k) => k.split('|')[0])).size;
+  if (n) saveBetano(store, lines);
+  toast(n ? `Llegaron ${n} líneas de Betano de ${players} jugadores.` : 'Este enlace no trae líneas de Betano.');
+  location.replace('#/nba/props');
 }
 
 async function sharePicks() {

@@ -167,3 +167,6 @@
   .pp-who h1 { font-size: 19px; }
   .pp-hctl .pp-field, .pp-hctl .pp-field select { width: 100%; max-width: none; }
 }
+.pp-ev-big { color: var(--warn); }
+.pp-steps { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+[data-dd="betano"] p { margin: 0; }
