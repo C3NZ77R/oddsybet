@@ -1,0 +1,116 @@
+/* Estadio en vivo (public/views/stadium.js) */
+.st-head { display: grid; justify-items: center; gap: 6px; margin-bottom: 6px; }
+.st-back { justify-self: start; font-size: 14px; text-decoration: none; }
+.st-board { display: flex; align-items: center; justify-content: center; gap: 10px 16px; }
+.st-team { display: inline-flex; align-items: center; gap: 8px; font-size: 16px; }
+.st-score { display: inline-flex; align-items: center; gap: 10px; perspective: 300px; }
+.st-score b { display: inline-block; min-width: 1ch; font-size: 38px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.st-score i { color: var(--muted); font-style: normal; }
+.st-status { margin: 0; color: var(--muted); font-size: 13px; }
+.st-delay { text-align: center; font-size: 12px; margin-bottom: 10px; }
+
+/* Escenario: la cancha inclinada con perspectiva; el balón se para con la inclinación contraria. */
+.st-arena { padding: 12px; overflow: hidden; }
+/* Gira sobre el borde cercano: ese borde conserva su ancho y el margen negativo recoge el alto que la inclinación deja vacío. */
+.st-stage { --tilt: 50deg; position: relative; perspective: 1100px; perspective-origin: 50% 0; padding: 0 3%; }
+.st-field {
+  position: relative; aspect-ratio: 105 / 68; margin: -15% 0 3%; border-radius: 6px;
+  transform-origin: 50% 100%; transform: rotateX(var(--tilt)); transform-style: preserve-3d;
+  background: repeating-linear-gradient(90deg, #0f5a35 0 9.52%, #13683e 9.52% 19.04%);
+  box-shadow: 0 40px 60px -20px rgba(0, 0, 0, .8), 0 0 0 1px rgba(255, 255, 255, .06);
+}
+.st-stage[data-sport="basketball"] .st-field {
+  aspect-ratio: 94 / 50;
+  background: repeating-linear-gradient(90deg, #b77b43 0 1.6%, #c18649 1.6% 3.2%);
+}
+/* Cada mitad lleva un tinte del equipo que la ataca: el local va hacia la derecha. */
+.st-field::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--away) 22%, transparent), transparent 30% 70%, color-mix(in srgb, var(--home) 22%, transparent));
+}
+.st-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; stroke: rgba(255, 255, 255, .78); stroke-width: .35; }
+.st-stage[data-sport="basketball"] .st-lines { stroke: rgba(255, 255, 255, .9); stroke-width: .28; }
+.st-lines .dot { fill: rgba(255, 255, 255, .85); }
+.st-lines .goal { stroke: #fff; fill: rgba(255, 255, 255, .18); }
+.st-lines .key { fill: rgba(0, 0, 0, .14); }
+.st-lines .board { stroke: #fff; stroke-width: .5; }
+.st-lines .rim { stroke: #ff6a13; stroke-width: .35; }
+
+.st-heat { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(8, 1fr); mix-blend-mode: screen; }
+.st-heat i { background: var(--c); filter: blur(7px); }
+.st-marks { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.st-marks path { fill: none; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1; filter: drop-shadow(0 0 3px rgba(255, 255, 255, .6)); }
+.st-pins { position: absolute; inset: 0; transform-style: preserve-3d; }
+.st-pin { position: absolute; width: 10px; height: 10px; transform: translate(-50%, -50%); border: 2px solid var(--c); border-radius: 50%; background: rgba(0, 0, 0, .35); }
+.st-pin.ok { background: var(--c); box-shadow: 0 0 8px var(--c); }
+.st-ring { position: absolute; width: 28px; height: 28px; border: 3px solid var(--c); border-radius: 50%; pointer-events: none; }
+
+.st-ballpos { position: absolute; width: 0; height: 0; transform-style: preserve-3d; }
+.st-shadow { position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(rgba(0, 0, 0, .7), transparent 70%); }
+.st-ballpos::after {
+  content: ""; position: absolute; left: -14px; top: -14px; width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .55); animation: st-breathe 1.8s ease-in-out infinite;
+}
+.st-ball { position: absolute; left: -9px; top: -18px; width: 18px; height: 18px; transform-style: preserve-3d; }
+.st-ball::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; transform-origin: 50% 100%; transform: rotateX(calc(var(--tilt) * -1));
+  background: radial-gradient(circle at 34% 30%, #fff 0 22%, #dfe5ea 48%, #8996a0 100%);
+  box-shadow: 0 0 10px rgba(255, 255, 255, .55);
+}
+.st-stage[data-sport="basketball"] .st-ball::before {
+  background: linear-gradient(90deg, transparent 47%, rgba(40, 18, 4, .8) 47% 53%, transparent 53%),
+    radial-gradient(circle at 34% 30%, #ffc184 0 15%, #ee7a25 55%, #8f3c0a 100%);
+  box-shadow: 0 0 10px rgba(255, 140, 50, .55);
+}
+@keyframes st-breathe { 50% { transform: scale(1.35); opacity: .25; } }
+
+.st-fx { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; overflow: hidden; }
+.st-big { grid-area: 1 / 1; margin: 0; font-size: clamp(30px, 9vw, 60px); font-weight: 900; letter-spacing: -.02em; color: #fff; text-shadow: 0 0 28px var(--c), 0 0 8px var(--c), 0 3px 0 rgba(0, 0, 0, .5); }
+.st-confetti { grid-area: 1 / 1; width: 8px; height: 12px; border-radius: 2px; }
+.st-empty { position: absolute; left: 12px; right: 12px; bottom: 8px; margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(0, 0, 0, .7); color: var(--muted); font-size: 13px; text-align: center; }
+
+.st-cap { min-height: 2.8em; margin: 12px 0 0; font-size: 15px; }
+.st-cap b { font-variant-numeric: tabular-nums; margin-right: 4px; }
+.st-kind { color: var(--c, var(--text)); font-weight: 700; }
+.st-cap small { color: var(--muted); }
+.st-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip-btn { padding: 6px 12px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+.chip-btn[aria-pressed="true"] { background: var(--grad); color: var(--on-accent); border-color: transparent; }
+.st-scrub { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+.st-scrub label { flex: 1 1 220px; }
+.st-scrub input[type="range"] { flex: 1; min-width: 0; padding: 0; accent-color: var(--teal); }
+
+.st-pulse, .st-zones, .st-feed { margin-top: 12px; }
+.st-pulse .hint { margin-bottom: 8px; }
+.st-chart { display: block; width: 100%; height: 120px; }
+.st-chart line { vector-effect: non-scaling-stroke; }
+.st-chart .mid { stroke: var(--line); }
+.st-chart .q { stroke: var(--line); stroke-dasharray: 2 4; }
+.st-chart .now { stroke: var(--text); stroke-dasharray: 3 3; }
+.st-chart .wp { fill: none; stroke: var(--teal); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.st-axis { display: flex; justify-content: space-between; margin: 2px 0 0; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.st-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.st-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; background: var(--c); vertical-align: -1px; }
+.st-runs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.st-runs li { padding: 3px 10px; border: 1px solid var(--c); border-radius: 999px; font-size: 12px; }
+.st-ztab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.st-ztab th, .st-ztab td { padding: 6px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+.st-ztab tbody th { text-align: left; color: var(--muted); font-weight: 500; }
+.st-ztab small { color: var(--muted); }
+.st-feed ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.st-feed button { width: 100%; padding: 6px 10px; border: 0; border-left: 3px solid var(--c); border-radius: 6px; background: none; text-align: left; font-size: 14px; }
+.st-feed button:hover { background: var(--panel-2); }
+.st-feed b { margin-right: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.st-feed small { color: var(--muted); }
+.lv-open { margin-left: auto; }
+
+/* En el celular la cancha es angosta: menos inclinación para que los tiros se lean. */
+@media (max-width: 600px) {
+  .st-arena { padding: 10px; }
+  .st-stage { --tilt: 40deg; padding: 0; }
+  .st-field { margin-top: -9%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-ballpos::after { animation: none; }
+}

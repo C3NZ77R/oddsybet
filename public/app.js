@@ -8,7 +8,7 @@ import { decode as decodeBetano, save as saveBetano } from './betano.js';
 
 const $ = (s) => document.querySelector(s);
 const LEAGUE_VIEWS = ['props', 'games', 'live', 'picks', 'insights', 'popular', 'seguir'];
-const DETAIL_VIEWS = ['props', 'games'];
+const DETAIL_VIEWS = ['props', 'games', 'live'];
 const NAMES = { props: 'Props', games: 'Partidos', live: 'En vivo', picks: 'Mejores apuestas', insights: 'Tendencias', popular: 'Populares', 'tennis-rankings': 'Ranking ATP', 'tennis-player': 'Jugador ATP', seguir: 'Mis apuestas' };
 const lastLeague = () => leagueById(store.get('league')) ?? LEAGUES[0];
 // El tenis solo tiene Partidos y Mejores apuestas (sin props, insights ni populares). Mis apuestas: solo la NBA.

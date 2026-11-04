@@ -58,7 +58,7 @@ function sigCard(sig, sport, inputs) {
 
 const team = (t) => h`<span class="lv-team">${teamLogo(t)}<b>${t.abbr || t.name}</b><b class="lv-pts">${t.score ?? 0}</b></span>`;
 
-function gameCard(g, x, sigs, sport, inputs) {
+function gameCard(g, x, sigs, sport, inputs, league) {
   const wp = g.winProb, stop = stopOn(g);
   const waiting = !x ? 'Cargando las líneas de Oddsy de este partido…'
     : g.progress < 0.1 ? 'Todavía es temprano para leer el ritmo: las señales salen después del 10% del partido.'
@@ -68,6 +68,7 @@ function gameCard(g, x, sigs, sport, inputs) {
       <div class="lv-teams">${team(g.away)}<span class="lv-vs">@</span>${team(g.home)}</div>
       <p class="lv-status"><span class="gm-live">En vivo</span> ${g.status?.detail ?? ''}</p>
       ${stop ? h`<p class="lv-stop" data-stop-at="${stop.at ?? ''}" data-stop-kind="${stop.kind}"><b>Pausa: ${stop.label}</b> · <span data-left>${leftText(windowLeft(stop))}</span></p>` : ''}
+      <a class="btn btn-primary lv-open" href="#/${league}/live/${g.id}">Ver estadio</a>
     </header>
     ${wp > 0.01 && wp < 0.99 ? h`<p class="lv-wp">Probabilidad de ganar según ESPN: <b>${g.home.abbr} ${fmtPct(wp, 0)}</b> (cuota justa ${fmtOdds(1 / wp)}) · <b>${g.away.abbr} ${fmtPct(1 - wp, 0)}</b> (${fmtOdds(1 / (1 - wp))})</p>` : ''}
     ${g.lastPlay ? h`<p class="lv-play"><small>Última jugada en ESPN${g.lastPlayAt ? ` (de hace ~${minsAgo(g.lastPlayAt)} min)` : ''}:</small> ${g.lastPlay}</p>` : ''}
@@ -77,7 +78,9 @@ function gameCard(g, x, sigs, sport, inputs) {
 
 export default {
   title: 'En vivo',
-  async render(el, { api, leagueInfo: lg }) {
+  async render(el, ctx) {
+    if (ctx.params.id) return (await import('./stadium.js')).default(el, ctx); // #/<liga>/live/<id>: el estadio de un partido
+    const { api, leagueInfo: lg } = ctx;
     const extras = new Map(); // gameId -> { props, total } | null mientras carga
     const inputs = new Map(); // id de señal -> { line, odds } que escribió el usuario
     const sigById = new Map();
@@ -110,7 +113,7 @@ export default {
       el.innerHTML = h`<header class="view-head"><div><h1>En vivo · ${lg.title}</h1>
         <p class="hint">Oddsy mira cada partido en juego y avisa cuando un jugador o el marcador van a un ritmo distinto al esperado. Escribe la línea en vivo de tu casa y te decimos qué tan probable es y si la cuota vale la pena. Los partidos en medio tiempo van arriba: es buen momento para apostar. No son picks: tú decides.</p>
         <p class="hint"><small>Datos de ESPN; se actualiza cada 15 s. ESPN publica cada jugada con unos minutos de atraso (unos 6), así que tu casa va más adelante: revisa el marcador y el precio antes de apostar.</small></p></div></header>
-        ${err ? errorBox(err) : rows.length ? rows.map(([g, x, s]) => gameCard(g, x, s, lg.sport, inputs))
+        ${err ? errorBox(err) : rows.length ? rows.map(([g, x, s]) => gameCard(g, x, s, lg.sport, inputs, lg.id))
           : h`${empty(`No hay partidos de ${lg.title} en juego ahora.`)}<p><a class="btn" href="#/${lg.id}/games">Ver los próximos partidos</a></p>`}`;
       const input = typing?.sig && el.querySelector(`[data-sig="${CSS.escape(typing.sig)}"] [name="${typing.name}"]`);
       if (input) {
