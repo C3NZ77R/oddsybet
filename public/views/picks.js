@@ -1,6 +1,7 @@
 // Mejores apuestas (#/<liga>/picks): por partido de hoy a +2 días, las selecciones más probables según el modelo, con la
 // cuota mínima a la que vale la pena y cuánto se cumplió ese tipo de predicción en el backtest (/api/picks).
 import { h, fmtPct, fmtOdds, when, empty, ymd } from '../ui.js';
+import { RG_LINE } from '../shell.js';
 
 // "Local o empate" → "Millonarios o empate"; el tenis ya trae los nombres de los jugadores.
 const named = (text, g) => String(text).replace(/\bLocal\b/g, g.home?.name ?? 'Local').replace(/\bVisitante\b/g, g.away?.name ?? 'Visitante');
@@ -22,10 +23,10 @@ function gameCard(g, picks) {
 }
 
 // Resumen de texto de las mejores apuestas del día para pegarlo en un grupo o chat de WhatsApp.
-export function dayText(title, rows, max = 8) {
+export function dayText(title, rows, url = '', max = 8) {
   const top = rows.flatMap(([g, ps]) => ps.map((p) => ({ g, p }))).sort((a, b) => b.p.p - a.p.p).slice(0, max);
   const lines = top.map(({ g, p }) => `• ${g.home?.name} vs ${g.away?.name}: ${pickText(p, g)} (${fmtPct(p.p, 0)}, cuota mínima ${fmtOdds(p.minOdds)})`);
-  return `Picks de Oddsy Bet · ${title}\n${lines.join('\n')}\nCuotas del modelo propio, con precisión publicada.`;
+  return `Picks de Oddsy Bet · ${title}\n${lines.join('\n')}\nCuotas del modelo propio, con precisión publicada.${url ? `\n${url}` : ''}\n${RG_LINE}`;
 }
 
 export default {
@@ -45,6 +46,6 @@ export default {
       <p class="hint">Las apuestas más probables de cada partido según Oddsy, para hoy y los próximos dos días. Apuesta solo si tu casa paga <b>la cuota mínima o más</b>. Si paga menos, a la larga pierdes plata aunque aciertes seguido. «Se cumplió» dice cuántas veces acertó ese tipo de apuesta en la temporada pasada, en partidos que Oddsy no había visto antes.</p></div></header>
       ${acc?.publish === false ? empty('Todavía no mostramos apuestas en esta liga: Oddsy aún no predice mejor que usar los resultados de la temporada pasada.')
         : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps]) => gameCard(g, ps))}` : empty('No hay partidos próximos con apuestas de 50% o más.')}`;
-    el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows))}`, '_blank', 'noopener'));
+    el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, `${location.origin}${location.pathname}#/${lg.id}/picks`))}`, '_blank', 'noopener'));
   },
 };

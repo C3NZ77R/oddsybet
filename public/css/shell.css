@@ -56,6 +56,9 @@
 .slip-total dt { color: var(--muted); font-size: 11px; }
 .slip-total dd { margin: 0; font-weight: 800; }
 .slip-note { margin: 0 0 10px; color: var(--muted); font-size: 11px; }
+.slip-ghead h3 { margin: 0; font-size: 13px; }
+.slip-gnote { margin: 0; padding: 8px 10px; color: var(--muted); font-size: 11px; }
+.slip-warn { margin: 0; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 12px; color: var(--warn); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
 .slip-actions { display: flex; gap: 8px; }
 .slip-actions .btn-primary { flex: 1; }
 .slip-fab { position: fixed; z-index: 50; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); width: 56px; height: 56px; display: grid; place-items: center; border-radius: 50%; border: 0; background: var(--grad); color: var(--on-accent); box-shadow: 0 10px 30px rgba(0,0,0,.6); }

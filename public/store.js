@@ -2,7 +2,7 @@
 // Claves: picks, settings, views, presets, league (última liga), heroSeen, track.
 const PREFIX = 'oddsy.';
 const DEFAULTS = {
-  picks: [], // [{ id, label, price (decimal), book, league, gameId, addedAt }]
+  picks: [], // [{ id, label, price (decimal), book, league, gameId, addedAt, shared? (vino de un enlace, sin verificar) }]
   settings: { oddsFormat: 'decimal' },
   views: {}, // { [propKey]: { view, add, last } } → "Populares" con actividad local
   presets: {}, // { [vista]: [{ name, ... }] }

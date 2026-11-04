@@ -149,7 +149,7 @@ th[aria-sort] .th-sort { color: var(--text); }
 
 /* Aviso flotante */
 .toast { position: fixed; left: 50%; bottom: 96px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 60; max-width: calc(100vw - 32px); padding: 10px 16px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--teal); font-size: 14px; font-weight: 600; transition: opacity .2s, transform .2s; }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; } /* auto: pasar el puntero lo pausa */
 
 footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px 16px; border-top: 1px solid var(--line); margin-top: 32px; }
 

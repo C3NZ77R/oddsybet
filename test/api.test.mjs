@@ -72,3 +72,14 @@ test('api: la caché guarda a lo sumo 200 respuestas y saca primero la más viej
     assert.equal(urls.length, 202);
   } finally { globalThis.fetch = real; }
 });
+
+test('api: una petición colgada se corta a los 15 s con un error claro', async (t) => {
+  const real = globalThis.fetch;
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  globalThis.fetch = (url, { signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('abort'))));
+  try {
+    const p = api.get('/api/colgada', {}, { fresh: true });
+    t.mock.timers.tick(15_000);
+    await assert.rejects(p, /tardó demasiado/);
+  } finally { globalThis.fetch = real; }
+});

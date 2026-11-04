@@ -1,9 +1,11 @@
 // Cliente del API de server.mjs. Cada función devuelve el cuerpo completo { source, data, remaining? }.
 // Caché en memoria de 60 s por URL y deduplicación de peticiones simultáneas.
 const TTL = 60_000;
+const TIMEOUT = 15_000; // sin límite, una petición colgada dejaba «Cargando…» para siempre
 const MAX = 200; // un lote de /api/gamelogs pesa ~2 MB: en sessionStorage llenaba la cuota y dejaba de cachear
 const cache = new Map(); // url -> { at, body }, de la más vieja a la más nueva
 const inflight = new Map();
+export const SLOW = 'El servidor tardó demasiado en responder. Revisa tu conexión e intenta de nuevo.';
 
 const param = (v) => (v && typeof v === 'object' ? v.id ?? String(v) : v); // acepta ctx.league (objeto) o 'nba'
 
@@ -19,17 +21,23 @@ export async function get(path, params = {}, { fresh = false } = {}) {
     if (inflight.has(url)) return inflight.get(url);
   }
   const p = (async () => {
-    let res;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+    let res, body;
     try {
-      res = await fetch(url);
-    } catch {
-      throw new Error('No se pudo conectar con el servidor. Revisa tu conexión.');
-    }
-    let body;
-    try {
-      body = await res.json();
-    } catch {
-      throw Object.assign(new Error(`Respuesta inválida del servidor (${res.status}).`), { status: res.status });
+      try {
+        res = await fetch(url, { signal: ctrl.signal });
+      } catch {
+        throw new Error(ctrl.signal.aborted ? SLOW : 'No se pudo conectar con el servidor. Revisa tu conexión.');
+      }
+      try {
+        body = await res.json();
+      } catch {
+        if (ctrl.signal.aborted) throw new Error(SLOW);
+        throw Object.assign(new Error(`Respuesta inválida del servidor (${res.status}).`), { status: res.status });
+      }
+    } finally {
+      clearTimeout(timer);
     }
     if (!res.ok) throw Object.assign(new Error(body?.error || `El servidor respondió ${res.status}.`), { status: res.status });
     cache.delete(url); // al final del Map: se saca primero la más vieja

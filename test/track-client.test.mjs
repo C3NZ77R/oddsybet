@@ -71,3 +71,15 @@ test('listFailed: con lista ya pintada la conserva y avisa una sola vez; sin lis
   listFailed(none, new Error('Sin <conexión>'));
   assert.match(String(none.innerHTML), /role="alert">Sin &lt;conexión&gt;</);
 });
+
+test('trackApi: una petición colgada se corta a los 30 s con un error claro', async (t) => {
+  const { trackApi } = await import('../public/track.js');
+  const real = globalThis.fetch;
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  globalThis.fetch = (url, { signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('abort'))));
+  try {
+    const p = trackApi.listBets();
+    t.mock.timers.tick(30_000);
+    await assert.rejects(p, /tardó demasiado/);
+  } finally { globalThis.fetch = real; }
+});

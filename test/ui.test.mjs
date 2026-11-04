@@ -201,8 +201,10 @@ test('picks del día: dayText resume las apuestas más probables para WhatsApp',
   const { dayText } = await import('../public/views/picks.js');
   const g = { home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
   const rows = [[g, [{ market: '1x2', name: 'Millonarios', p: 0.55, minOdds: 1.85 }, { market: 'total', label: 'Total', name: 'Más de 2.5', p: 0.6, minOdds: 1.7 }]]];
-  const t = dayText('Liga BetPlay', rows);
+  const t = dayText('Liga BetPlay', rows, 'https://oddsy.example/#/col.1/picks');
   assert.match(t, /Liga BetPlay/);
+  assert.ok(t.includes('https://oddsy.example/#/col.1/picks')); // quien lo recibe puede verificarlo
+  assert.match(t, /\+18\. Oddsy no recibe apuestas; juega con responsabilidad\.$/);
   assert.ok(t.indexOf('Más de 2.5') < t.indexOf('Gana Millonarios')); // la más probable primero
 });
 

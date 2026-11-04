@@ -3,11 +3,12 @@ import { api } from './api.js';
 import { store, encodePicks, decodePicks } from './store.js';
 import { ui, h, empty, fmtOdds, fmtPct, bookInfo, bookChip, raw } from './ui.js';
 import { LEAGUES, leagueById } from './leagues.js';
-import { parlayOdds } from './betmath.js';
+import { RG_LINE, importPicks, slipModel, combinedOdds, slipText, toastMs, hasUserInput } from './shell.js';
 
 const $ = (s) => document.querySelector(s);
 const LEAGUE_VIEWS = ['props', 'games', 'live', 'picks', 'insights', 'popular', 'seguir'];
 const DETAIL_VIEWS = ['props', 'games'];
+const KEEP_INPUT = ['seguir', 'live', 'insights'];
 const NAMES = { props: 'Props', games: 'Partidos', live: 'En vivo', picks: 'Mejores apuestas', insights: 'Tendencias', popular: 'Populares', 'tennis-rankings': 'Ranking ATP', 'tennis-player': 'Jugador ATP', seguir: 'Mis apuestas' };
 const lastLeague = () => leagueById(store.get('league')) ?? LEAGUES[0];
 // El tenis solo tiene Partidos y Mejores apuestas (sin props, insights ni populares). Mis apuestas: solo la NBA.
@@ -37,7 +38,7 @@ function navigate(hash, { replace = false } = {}) {
 }
 
 // ---------- router ----------
-let seq = 0, cleanup = null, lastKey = '';
+let seq = 0, cleanup = null, lastKey = '', curView = '';
 function runCleanup() {
   const fn = cleanup;
   cleanup = null;
@@ -50,6 +51,7 @@ async function route() {
   if (r.name === 'share') return importShare(r.query);
   const my = ++seq;
   runCleanup();
+  curView = r.name;
   if (r.league && r.league.id !== store.get('league')) store.set('league', r.league.id);
   const league = r.league ?? lastLeague();
   updateChrome(r, league);
@@ -114,15 +116,15 @@ function updateChrome(r, league) {
 // ---------- compartir picks ----------
 function importShare(query) {
   const incoming = decodePicks(query.get('p'));
-  const have = new Set(store.get('picks').map((p) => p.id));
   // El boleto nunca pasa de 50 picks, el mismo tope que decodePicks.
-  const add = incoming.filter((p) => !have.has(p.id)).slice(0, Math.max(0, 50 - have.size)).map((p) => ({ ...p, addedAt: Date.now() }));
+  const add = importPicks(store.get('picks'), incoming);
   if (add.length) store.set('picks', [...store.get('picks'), ...add]);
   toast(incoming.length
-    ? `Se agregaron ${add.length} de ${incoming.length} picks del enlace compartido.`
+    ? `Se agregaron ${add.length} de ${incoming.length} picks que alguien armó con el modelo de Oddsy. Van aparte en tu boleto: la cuota viene del enlace, sin verificar.`
     : 'Este enlace no tiene picks válidos.');
   if (incoming.length) openSlip();
-  location.replace(defaultHash());
+  const lg = leagueById(incoming[0]?.league);
+  location.replace(lg ? `#/${lg.id}/picks` : defaultHash());
 }
 
 async function sharePicks() {
@@ -138,17 +140,17 @@ async function sharePicks() {
 function shareWhatsApp() {
   const picks = store.get('picks');
   const url = `${location.origin}${location.pathname}#/share?p=${encodePicks(picks)}`;
-  const lines = picks.slice(0, 10).map((p) => `• ${p.label} @ ${fmtOdds(p.price)}`);
-  const text = `Mis picks en Oddsy Bet (cuotas del modelo):\n${lines.join('\n')}\n${url}`;
+  const text = slipText(picks, url, fmtOdds);
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
 }
 
 // ---------- boleto ----------
 const leagueTitle = (id) => leagueById(id)?.title ?? id;
-const combined = (list) => {
-  const prices = list.map((p) => p.price).filter((x) => x > 1);
-  return prices.length ? parlayOdds(prices) : null;
-};
+const pickLi = (p) => h`<li class="slip-pick">
+  <div class="slip-txt"><span class="slip-label">${p.label}</span>${p.league ? h`<small>${leagueTitle(p.league)}</small>` : ''}</div>
+  <b class="slip-price">${fmtOdds(p.price)}</b>
+  <button type="button" class="icon-btn sm" data-remove="${p.id}" aria-label="Quitar ${p.label}">✕</button>
+</li>`;
 
 function renderSlip() {
   const picks = store.get('picks');
@@ -160,26 +162,29 @@ function renderSlip() {
     foot.innerHTML = '';
     return;
   }
+  const { own, shared, conflicts, total } = slipModel(picks);
   const groups = new Map();
-  for (const p of picks) {
+  for (const p of own) {
     const k = bookInfo(p.book).key;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(p);
   }
-  body.innerHTML = h`${[...groups.values()].map((list) => h`<section class="slip-group" aria-label="${bookInfo(list[0].book).name}: ${list.length} ${list.length === 1 ? 'pick' : 'picks'}">
-      <header class="slip-ghead">${bookChip(list[0].book)}<span class="slip-n">${list.length}/${picks.length}</span>${list.length > 1 ? h`<span class="slip-par" title="Cuota combinada en esta casa">${fmtOdds(combined(list))}</span>` : ''}</header>
-      <ul>${list.map((p) => h`<li class="slip-pick">
-        <div class="slip-txt"><span class="slip-label">${p.label}</span>${p.league ? h`<small>${leagueTitle(p.league)}</small>` : ''}</div>
-        <b class="slip-price">${fmtOdds(p.price)}</b>
-        <button type="button" class="icon-btn sm" data-remove="${p.id}" aria-label="Quitar ${p.label}">✕</button>
-      </li>`)}</ul></section>`)}`;
-  const total = combined(picks);
+  body.innerHTML = h`${conflicts.length ? h`<p class="slip-warn">${conflicts.map(([a, b]) => h`«${a.label}» y «${b.label}» no pueden ganar juntas. `)}Quita una para ver la cuota combinada.</p>` : ''}
+    ${[...groups.values()].map((list) => h`<section class="slip-group" aria-label="${bookInfo(list[0].book).name}: ${list.length} ${list.length === 1 ? 'pick' : 'picks'}">
+      <header class="slip-ghead">${bookChip(list[0].book)}<span class="slip-n">${list.length}/${picks.length}</span>${list.length > 1 && !conflicts.length ? h`<span class="slip-par" title="Cuota combinada del modelo">${fmtOdds(combinedOdds(list))}</span>` : ''}</header>
+      <ul>${list.map(pickLi)}</ul></section>`)}
+    ${shared.length ? h`<section class="slip-group slip-shared" aria-labelledby="slipSharedTitle">
+      <header class="slip-ghead"><h3 id="slipSharedTitle">Picks que te compartieron</h3><span class="slip-n">${shared.length}/${picks.length}</span></header>
+      <p class="slip-gnote">Los armó otra persona con el modelo de Oddsy. Cuota del enlace, sin verificar: no entra en la cuota combinada.</p>
+      <ul>${shared.map(pickLi)}</ul>
+      <p class="slip-gnote"><button type="button" class="btn sm" data-drop-shared>Descartar los compartidos</button></p></section>` : ''}`;
   foot.innerHTML = h`<dl class="slip-total">
       <div><dt>Picks</dt><dd>${picks.length}</dd></div>
       <div><dt>Cuota combinada</dt><dd>${fmtOdds(total)}</dd></div>
-      <div><dt>Probabilidad según la cuota</dt><dd>${fmtPct(total ? 1 / total : null, 1)}</dd></div>
+      <div><dt>Probabilidad implícita en la cuota, con el margen de Oddsy</dt><dd>${fmtPct(total ? 1 / total : null, 1)}</dd></div>
     </dl>
     <p class="slip-note">La cuota combinada es solo una referencia. Si juntas picks del mismo partido, unos dependen de otros, y cada casa tiene sus propias reglas para combinarlos.</p>
+    <p class="slip-note"><b>${RG_LINE}</b></p>
     <div class="slip-actions"><button type="button" class="btn btn-primary" data-share>Compartir</button><button type="button" class="btn" data-share-wa>WhatsApp</button><button type="button" class="btn" data-clear>Vaciar</button></div>`;
 }
 
@@ -209,13 +214,19 @@ function syncOddsToggle() {
 
 // ---------- utilidades del shell ----------
 let toastTimer;
-function toast(msg) {
+function armToast() {
   const t = $('#toast');
-  t.textContent = msg;
-  t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+  toastTimer = setTimeout(() => t.classList.remove('show'), toastMs(t.textContent));
 }
+function toast(msg) {
+  $('#toast').textContent = msg;
+  $('#toast').classList.add('show');
+  armToast();
+}
+// Se detiene mientras el puntero o el foco estén encima, para terminar de leerlo.
+for (const ev of ['pointerenter', 'focusin']) $('#toast').addEventListener(ev, () => clearTimeout(toastTimer));
+for (const ev of ['pointerleave', 'focusout']) $('#toast').addEventListener(ev, () => $('#toast').classList.contains('show') && armToast());
 
 // ---------- eventos ----------
 $('#view').addEventListener('click', (e) => { if (e.target.closest('[data-retry]')) route(); });
@@ -236,6 +247,7 @@ $('#slip').addEventListener('click', (e) => {
   if (e.target.closest('[data-slip-close]')) return closeSlip(true);
   if (e.target.closest('[data-share-wa]')) return shareWhatsApp();
   if (e.target.closest('[data-share]')) return sharePicks();
+  if (e.target.closest('[data-drop-shared]')) { store.set('picks', store.get('picks').filter((p) => !p.shared)); $('#slipTitle').focus(); return; }
   if (e.target.closest('[data-clear]') && window.confirm('¿Vaciar todos los picks del boleto?')) store.set('picks', []);
 });
 wide.addEventListener('change', syncSlip);
@@ -246,6 +258,8 @@ store.on('settings', (s) => {
   lastFormat = s.oddsFormat;
   syncOddsToggle();
   renderSlip();
+  // Mis apuestas, En vivo y Tendencias no guardan lo escrito: si hay algo, se deja la vista como está.
+  if (KEEP_INPUT.includes(curView) && hasUserInput($('#view'))) return toast('Formato cambiado en el boleto. Esta vista lo usará cuando la vuelvas a abrir, así no pierdes lo que escribiste.');
   route();
 });
 
