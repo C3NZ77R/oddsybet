@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { poissonPmf } from '../public/betmath.js';
-import { price, MARGIN, MAX_P, halfLine, negBinPmf, scoreGrid, normalOver, countOver } from '../lib/pricing.mjs';
+import { price, MARGIN, MAX_P, halfLine, negBinPmf, scoreGrid, normalOver, countOver, powerOdds, marginOf } from '../lib/pricing.mjs';
 
 const near = (a, b, eps = 1e-3) => assert.ok(Math.abs(a - b) < eps, `${a} ≈ ${b}`);
 const close = (a, b) => near(a, b, 1e-12);
@@ -47,4 +47,15 @@ test('normalOver y countOver', () => {
 test('negBinPmf suma 1; sin sobredispersión usa Poisson', () => {
   near(sum(Array.from({ length: 61 }, (_, k) => negBinPmf(k, 5, 9))), 1, 1e-6);
   near(negBinPmf(2, 5, 4), poissonPmf(2, 5), 1e-12);
+});
+
+test('powerOdds: el mercado suma 1 + margen y el no favorito carga más (1X2 de Betano, Medellín–Alianza)', () => {
+  const ps = [0.6297, 0.2217, 0.1486]; // justas de 1.55 / 4.15 / 6.00 sin el margen
+  const odds = powerOdds(ps, 0.05);
+  near(sum(odds.map((o) => 1 / o)), 1.05, 0.01);
+  const carga = odds.map((o, i) => 1 / (o * ps[i]) - 1);
+  assert.ok(carga[0] < carga[1] && carga[1] < carga[2], `${carga}`);
+  assert.equal(marginOf('1x2'), 0.05);
+  assert.equal(marginOf('btts'), 0.07);
+  assert.equal(marginOf('cards_1x2'), 0.09);
 });
