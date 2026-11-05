@@ -63,7 +63,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let game = null, plays = [], err = null, built = false, stopped = false;
   // Cada carga trae objetos nuevos: la cola y la jugada actual se guardan por `seq`, que es estable entre cargas.
-  let cur = -1, curSeq = null, mode = 'live', layer = 'plays', col = null, feedKey = '';
+  let cur = -1, curSeq = null, mode = 'live', layer = 'plays', col = null, feedKey = null;
   const seen = new Set(), queue = [];
   let pumpTimer = null, step = 0, ball = { x: 50, y: 50 };
   const $ = (s) => el.querySelector(s);
@@ -184,7 +184,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
   function show(i, animate) {
     const p = plays[i];
     if (!p) return;
-    step++;
+    if (!animate) step++; // un salto cancela lo pendiente; en la repetición la celebración del gol anterior sí debe salir
     cur = i;
     curSeq = p.seq;
     const color = sideCol(p);
@@ -329,7 +329,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
 
   function paintFeed() {
     const list = plays.slice(Math.max(0, plays.length - 8)).reverse();
-    const key = list.map((p) => `${p.seq}:${p.id}:${p.label}`).join('|');
+    const key = list.map((p) => `${p.seq}:${p.id}:${p.label}:${p.who}:${p.side}:${p.clock}`).join('|');
     if (key === feedKey) return; // sin cambios no se repinta: quien navega con teclado no pierde el foco cada 10 s
     feedKey = key;
     $('[data-feed]').innerHTML = list.length ? h`${list.map((p) => h`<li><button type="button" data-goto="${p.seq}" style="--c:${sideCol(p)}">
@@ -351,6 +351,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
     if (curSeq != null) cur = plays.findLastIndex((p) => p.seq <= curSeq);
     const scrub = $('[data-scrub]');
     scrub.max = Math.max(0, plays.length - 1);
+    if (cur >= 0) scrub.value = cur;
     scrub.disabled = plays.length < 2;
     for (const b of el.querySelectorAll('[data-layer],[data-replay]')) b.disabled = !plays.length;
     const placed = plays.some((p) => p.x != null);

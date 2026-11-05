@@ -76,6 +76,7 @@
 .st-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chip-btn { padding: 6px 12px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 13px; font-weight: 600; }
 .chip-btn[aria-pressed="true"] { background: var(--grad); color: var(--on-accent); border-color: transparent; }
+.st-arena button:disabled { opacity: .45; cursor: not-allowed; }
 .st-scrub { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
 .st-scrub label { flex: 1 1 220px; }
 .st-scrub input[type="range"] { flex: 1; min-width: 0; padding: 0; accent-color: var(--teal); }
