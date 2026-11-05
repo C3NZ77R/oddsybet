@@ -201,8 +201,10 @@ test('picks del día: dayText resume las apuestas más probables para WhatsApp',
   const { dayText } = await import('../public/views/picks.js');
   const g = { home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
   const rows = [[g, [{ market: '1x2', name: 'Millonarios', p: 0.55, minOdds: 1.85 }, { market: 'total', label: 'Total', name: 'Más de 2.5', p: 0.6, minOdds: 1.7 }]]];
-  const t = dayText('Liga BetPlay', rows);
+  const t = dayText('Liga BetPlay', rows, 8, null, 'https://oddsy.example/#/col.1/picks');
   assert.match(t, /Liga BetPlay/);
+  assert.ok(t.includes('https://oddsy.example/#/col.1/picks')); // quien lo recibe puede verificarlo
+  assert.match(t, /\+18\. Oddsy no recibe apuestas; juega con responsabilidad\.$/);
   assert.ok(t.indexOf('Más de 2.5') < t.indexOf('Gana Millonarios')); // la más probable primero
 });
 
@@ -320,4 +322,27 @@ test('picks: la doble oportunidad nombra a los dos equipos ("Millonarios o Nacio
   assert.match(t, /Doble oportunidad: Empate o Nacional/);
   assert.match(t, /Doble oportunidad: Millonarios o empate/);
   assert.doesNotMatch(t, /visitante/i);
+});
+
+test('Partidos: al repintar, el foco vuelve al mismo control de la misma tarjeta', async () => {
+  const { focusSpot, refocus } = await import('../public/views/games.js');
+  globalThis.CSS ??= { escape: (s) => s };
+  const card = (id) => {
+    const els = [{ id: `${id}-link` }, { id: `${id}-pick`, focus() { focused = this.id; } }];
+    const c = { dataset: { id }, querySelectorAll: () => els };
+    els.forEach((e) => { e.closest = () => c; });
+    return c;
+  };
+  let focused = null;
+  const before = [card('1'), card('2')], after = [card('1'), card('2')];
+  const list = (cards) => ({
+    contains: (a) => cards.some((c) => c.querySelectorAll().includes(a)),
+    querySelector: (sel) => cards.find((c) => sel === `.gm-card[data-id="${c.dataset.id}"]`) ?? null,
+  });
+  const spot = focusSpot(list(before), before[1].querySelectorAll()[1]);
+  assert.deepEqual(spot, { id: '2', i: 1 });
+  refocus(list(after), spot);
+  assert.equal(focused, '2-pick');
+  assert.equal(focusSpot(list(before), { closest: () => null }), null); // foco fuera de la lista
+  refocus(list(after), null); // sin foco previo no hace nada
 });

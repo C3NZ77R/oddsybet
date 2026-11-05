@@ -2,6 +2,7 @@
 // cuota mínima a la que vale la pena y cuánto se cumplió ese tipo de predicción en el backtest (/api/picks). Arriba, el
 // registro de Oddsy (/api/record): cómo le fue a cada pick del partido (★), guardado antes de empezar y cerrado con ESPN.
 import { h, fmtPct, fmtOdds, when, empty, ymd } from '../ui.js';
+import { RG_LINE } from '../shell.js';
 
 // "Local o visitante" → "Millonarios o Nacional" (en minúscula o mayúscula); el tenis ya trae los nombres de los jugadores.
 const named = (text, g) => String(text).replace(/\blocal\b/gi, g.home?.name ?? 'Local').replace(/\bvisitante\b/gi, g.away?.name ?? 'Visitante');
@@ -44,7 +45,7 @@ function learnText(m) {
 
 export function recordHtml(r) {
   if (!r) return '';
-  const intro = h`<p class="hint">Cada pick del partido (★) se guarda antes de que empiece y se cierra solo con el resultado de ESPN. No se borra ninguno, tampoco los perdidos.</p>`;
+  const intro = h`<p class="hint">Guardamos cada pick ★ antes del partido y lo cerramos con el resultado de ESPN. No borramos los perdidos.</p>`;
   if (!r.since) return h`<section class="card pk-record"><h2>Registro de Oddsy</h2>${intro}<p>El registro empieza con el próximo partido que tenga pick.</p></section>`;
   const day = r.day;
   const g = (p) => ({ home: { name: p.home }, away: { name: p.away } });
@@ -66,13 +67,13 @@ export function recordHtml(r) {
 }
 
 // Resumen de texto de las mejores apuestas del día para pegarlo en un grupo o chat de WhatsApp: primero los picks del
-// partido y, si hay registro, cómo le fue a Oddsy.
-export function dayText(title, rows, max = 8, record = null) {
+// partido y, si hay registro, cómo le fue a Oddsy. url: el enlace a la vista, para que quien lo recibe lo verifique.
+export function dayText(title, rows, max = 8, record = null, url = '') {
   const top = rows.flatMap(([g, ps]) => ps.map((p) => ({ g, p }))).sort((a, b) => Number(Boolean(b.p.featured)) - Number(Boolean(a.p.featured)) || b.p.p - a.p.p).slice(0, max);
   const lines = top.map(({ g, p }) => `• ${p.featured ? '★ ' : ''}${g.home?.name} vs ${g.away?.name}: ${pickText(p, g)} (${fmtPct(p.p, 0)}, cuota mínima ${fmtOdds(p.minOdds)})`);
   const month = record?.windows?.[1];
   const past = record?.day ? `${dayTitle(record.day).replace(' · ', ': ')}${month?.won + month?.lost ? ` · últimos 30 días: ${fmtPct(month.hit, 0)}` : ''}\n` : '';
-  return `Picks de Oddsy Bet · ${title}\n${past}${lines.join('\n')}\nCuotas del modelo propio, con precisión publicada.`;
+  return `Picks de Oddsy Bet · ${title}\n${past}${lines.join('\n')}\nCuotas del modelo propio, con precisión publicada.${url ? `\n${url}` : ''}\n${RG_LINE}`;
 }
 
 export default {
@@ -96,10 +97,10 @@ export default {
     const rows = res.flatMap(([, pk]) => pk.data ?? []).map((x) => [games.get(x.gameId), x.picks.filter((p) => p.p >= 0.5)])
       .filter(([g, ps]) => g?.status?.state === 'pre' && ps.length).sort(([a], [b]) => a.start.localeCompare(b.start));
     el.innerHTML = h`<div data-record>${recordHtml(record)}</div><header class="view-head"><div><h1>Mejores apuestas · ${lg.title}</h1>
-      <p class="hint">Las apuestas más probables de cada partido según Oddsy, para hoy y los próximos dos días. Apuesta solo si tu casa paga <b>la cuota mínima o más</b>. Si paga menos, a la larga pierdes plata aunque aciertes seguido. «Se cumplió» dice cuántas veces acertó ese tipo de apuesta en la temporada pasada, en partidos que Oddsy no había visto antes.</p></div></header>
+      <p class="hint">Lo más probable de cada partido, de hoy a pasado mañana. Apuesta solo si tu casa paga <b>la cuota mínima o más</b>; si paga menos, pierdes plata a la larga. «Se cumplió» es cuántas veces acertó esa apuesta la temporada pasada.</p></div></header>
       ${acc?.publish === false ? empty('Todavía no mostramos apuestas en esta liga: Oddsy aún no predice mejor que usar los resultados de la temporada pasada.')
         : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps]) => gameCard(g, ps))}` : empty('No hay partidos próximos con apuestas de 50% o más.')}`;
-    el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, 8, record))}`, '_blank', 'noopener'));
+    el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, 8, record, `${location.origin}${location.pathname}#/${lg.id}/picks`))}`, '_blank', 'noopener'));
     // Si se cambió de vista mientras tanto, el hueco ya no está en la página y no se toca nada.
     if (first === LATE) recordP.then((rec) => {
       const slot = el.querySelector?.('[data-record]');

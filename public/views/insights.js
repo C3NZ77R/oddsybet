@@ -124,7 +124,7 @@ export default {
     const sel = (name, label, opts) => `<label class="ins-sel">${label} <select name="${name}">${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>`;
     el.innerHTML = `<section class="ins">
       <h1>Tendencias ${esc(lg.title)}</h1>
-      <p class="hint">Lo que han hecho jugadores y equipos en sus últimos partidos, para los juegos de hoy y de los próximos 3 días. Datos de ESPN.</p>
+      <p class="hint">Cómo vienen jugadores y equipos en sus últimos partidos, para los juegos de hoy y los próximos 3 días.</p>
       <form class="ins-bar" aria-label="Filtros de tendencias">
         ${multi('cat', 'Tipo')}${multi('game', 'Partidos')}${multi('player', 'Jugadores')}${multi('team', 'Equipos')}
         <details class="ins-flt" data-name="odds"><summary>Cuotas<span class="ins-n"></span></summary><div class="ins-opts ins-range">
@@ -235,7 +235,7 @@ export default {
         ? shown.slice(0, page).map((it, i) => card(it, i, inSlip)).join('') + (rest > 0 ? `<button type="button" class="ins-more">Mostrar más (${rest})</button>` : '')
         : prog.loading ? '' : H(ui.empty(items.length ? 'Ninguna tendencia cumple estos filtros.' : 'No hay tendencias para los próximos partidos de esta liga.'));
       // Sin props de jugador (solo cubren los próximos 3 partidos de hoy) quedan solo los insights de equipo.
-      if (!prog.loading && !prog.props) listEl.insertAdjacentHTML('afterbegin', `<p class="hint">Por ahora solo hay tendencias de equipos. Las de jugadores salen para los próximos 3 partidos de hoy; para otros, abre el partido: <a href="#/${esc(league)}/games">ver partidos</a>.</p>`);
+      if (!prog.loading && !prog.props) listEl.insertAdjacentHTML('afterbegin', `<p class="hint">Por ahora solo hay tendencias de equipos. Las de jugadores salen para los 3 próximos partidos de hoy; para otro, ábrelo en <a href="#/${esc(league)}/games">Partidos</a>.</p>`);
       root.querySelector('.ins-progress').innerHTML = prog.loading
         ? `Analizando ${prog.done} de ${prog.total || '…'} (partidos y jugadores)…`
         : `${prog.games} partidos y ${prog.players} jugadores analizados${prog.failed ? ` · ${prog.failed} sin datos` : ''}. ${prog.source ? H(ui.sourceBadge(prog.source)) : ''}`;

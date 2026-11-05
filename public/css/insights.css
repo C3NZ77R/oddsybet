@@ -14,7 +14,7 @@
 .ins-range input { width: 96px; }
 .ins-none { color: var(--muted); padding: 4px 6px; }
 .ins-sel { font-size: 13px; }
-.ins-sel select { padding: 6px 8px; font-size: 13px; }
+.ins-sel select { padding: 6px 8px; }
 .ins-reset { background: none; border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .ins-reset:hover { color: var(--text); border-color: var(--teal); }
 .ins-count { margin-left: auto; color: var(--muted); font-size: 13px; font-weight: 700; white-space: nowrap; }
@@ -46,4 +46,6 @@
   .ins-flt[open] { flex-basis: 100%; }
   .ins-opts { position: static; max-width: none; margin-top: 6px; box-shadow: none; }
   .ins-count { margin-left: 0; flex-basis: 100%; }
+  .ins-who a, .ins-who b { white-space: normal; } /* el nombre completo en dos líneas, no «Ausar Tho…» */
+  .ins-who a { padding: 10px 0; margin: -10px 0; }
 }

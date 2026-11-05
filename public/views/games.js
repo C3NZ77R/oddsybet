@@ -154,11 +154,22 @@ function onTabClick(root, e, onOpen) {
 }
 
 // ---------- lista ----------
+// Al repintar cada 60 s el foco vuelve al mismo control de la misma tarjeta (por data-id y posición).
+const FOCUSABLE = 'a, button, summary, input, select';
+export const focusSpot = (list, a) => {
+  const card = a && list.contains(a) ? a.closest('.gm-card') : null;
+  return card ? { id: card.dataset.id, i: [...card.querySelectorAll(FOCUSABLE)].indexOf(a) } : null;
+};
+export const refocus = (list, spot) => {
+  if (spot) list.querySelector(`.gm-card[data-id="${CSS.escape(spot.id)}"]`)?.querySelectorAll(FOCUSABLE)[spot.i]?.focus();
+};
+
 async function renderList(root, ctx, lg, state) {
   const { api } = ctx;
   const tennis = lg.sport === 'tennis';
   root.innerHTML = `<header class="gm-header"><h1>Partidos · ${esc(lg.title)}</h1>${tennis ? '<a class="gm-more" href="#/tennis-rankings">Ranking ATP →</a>' : ''}<span class="gm-badges" data-badges></span></header>
     <nav class="gm-dates" aria-label="Fechas" data-dates></nav>
+    <p class="gm-livebar" data-livebar hidden><button type="button" class="btn sm" data-pause aria-pressed="false">Pausar actualización</button></p>
     <div class="gm-list" data-list>${ui.loading()}</div>
     <p class="gm-src" data-note hidden></p>`;
 
@@ -229,6 +240,8 @@ async function renderList(root, ctx, lg, state) {
     const games = [...byDate.get(state.date)].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
     const list = root.querySelector('[data-list]');
     const date = state.date;
+    const spot = focusSpot(list, document.activeElement);
+    root.querySelector('[data-livebar]').hidden = !games.some(isLive);
     io?.disconnect();
     pc.picks = [];
     list.innerHTML = games.map((g) => cardHtml(g, lg.id, { mk: null, ctx: pc, open: state.open.has(g.id), date })).join('');
@@ -242,6 +255,8 @@ async function renderList(root, ctx, lg, state) {
       }
       note.textContent = mk.error || mk.accuracy?.publish === false ? '' : accText(mk.accuracy);
       note.hidden = !note.textContent;
+      // Con las cuotas ya puestas la tarjeta queda como estaba; si el usuario no movió el foco, vuelve a su sitio.
+      if (!document.activeElement || document.activeElement === document.body) refocus(list, spot);
     });
   };
 
@@ -250,6 +265,13 @@ async function renderList(root, ctx, lg, state) {
 
   root.addEventListener('click', (e) => {
     if (onPickClick(e, pc)) return;
+    const p = e.target.closest('[data-pause]');
+    if (p) {
+      state.paused = !state.paused;
+      p.setAttribute('aria-pressed', String(state.paused));
+      p.textContent = state.paused ? 'Reanudar' : 'Pausar actualización';
+      return;
+    }
     const b = e.target.closest('[data-date]');
     if (!b) return;
     state.date = b.dataset.date;
@@ -266,7 +288,7 @@ async function renderList(root, ctx, lg, state) {
 
   // Marcadores en vivo: cada 60 s si el día elegido tiene partidos en juego.
   state.timer = setInterval(async () => {
-    if (document.hidden) return; // pestaña oculta: no se gasta red
+    if (document.hidden || state.paused) return; // pestaña oculta o en pausa: no se gasta red ni se repinta
     if (!byDate.get(state.date)?.some(isLive)) return;
     try {
       const fresh = dataOf(await api.get('/api/games', { league: lg.id, date: state.date }, { fresh: true }));
