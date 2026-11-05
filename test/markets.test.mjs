@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { marketsFor, getMarkets } from '../lib/markets.mjs';
-import { scoreGrid, normalOver, halfLine, MAX_P, publishable } from '../lib/pricing.mjs';
+import { scoreGrid, normalOver, halfLine, MAX_P, publishable, marginOf } from '../lib/pricing.mjs';
 import { matchDist, setGames, getHistory, getEloHistory, eloFrom, matchProb } from '../lib/tennis.mjs';
 import { getSeasonResults } from '../lib/espn.mjs';
 import { ratingsFromResults, expected } from '../lib/ratings.mjs';
@@ -210,7 +210,10 @@ test('mercados publicados: nada por encima de MAX_P (con dos lados cae el mercad
     assert.ok(all.some((m) => m.selections.some((s) => s.p > MAX_P)), 'el caso tiene selecciones que topan en 1.01');
     for (const m of ms) {
       assert.ok(m.selections.length >= 2, m.label);
-      for (const s of m.selections) assert.ok(s.p <= MAX_P && s.p * s.oddsy <= 1 / 1.05 + 1e-9, `${m.label} ${s.name} ${s.p}`);
+      for (const s of m.selections) assert.ok(s.p <= MAX_P && s.p * s.oddsy < 1, `${m.label} ${s.name} ${s.p}`);
+      // Cada mercado lleva su margen (la doble oportunidad no suma 1); truncar a centésimos solo lo sube un poco.
+      const over = m.selections.reduce((t, s) => t + 1 / s.oddsy, 0) - 1;
+      if (m.key !== 'dc') assert.ok(over >= marginOf(m.key) - 1e-9 && over < marginOf(m.key) + 0.03, `${m.label}: ${over}`);
       const full = all.find((x) => x.label === m.label);
       if (full.selections.length === 2) assert.equal(m.selections.length, 2, m.label);
     }
