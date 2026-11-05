@@ -66,6 +66,48 @@ export function shotZones(plays, side) {
   return z;
 }
 
+// Quién tiró en el partido (tiros de campo de básquet), de más a menos intentos: la lista para elegir los tiros de uno.
+export function shooters(plays) {
+  const by = new Map();
+  for (const p of plays) {
+    if (p.kind !== 'shot' || !p.who || !SIDES.includes(p.side)) continue;
+    const s = by.get(p.who) ?? by.set(p.who, { who: p.who, side: p.side, att: 0, made: 0 }).get(p.who);
+    s.att++;
+    if (p.made) s.made++;
+  }
+  return [...by.values()].sort((a, b) => b.att - a.att || a.who.localeCompare(b.who));
+}
+
+// Planilla de tiro de un jugador: de campo, triples (por la zona del tiro) y libres. Lo que miran las props de puntos.
+export function shotLine(plays, who) {
+  const line = { fg: { made: 0, att: 0 }, three: { made: 0, att: 0 }, ft: { made: 0, att: 0 } };
+  const add = (k, made) => { line[k].att++; if (made) line[k].made++; };
+  for (const p of plays) {
+    if (p.who !== who) continue;
+    if (p.kind === 'ft') add('ft', p.made);
+    if (p.kind !== 'shot') continue;
+    add('fg', p.made);
+    if (p.zone === 'corner3' || p.zone === 'arc3') add('three', p.made);
+  }
+  return line;
+}
+
+// Jugadas que dicen dónde está atacando un equipo de fútbol. La falta no: su tiro libre (del que la recibe) ya lo dice.
+const ATTACK = new Set(['goal', 'shot-on', 'shot-off', 'blocked', 'post', 'pen-miss', 'corner', 'free-kick', 'offside']);
+// Hacia dónde va el ataque en la jugada i, según la última jugada de ataque con posición: quién ataca, la x en su marco
+// (hacia 100) y el nivel. Si esa jugada es de hace más de `window` segundos de partido ya no dice nada y da null.
+export function attackNow(plays, i, window = 180) {
+  const now = plays[i];
+  for (let k = Math.min(i, plays.length - 1); k >= 0; k--) {
+    const p = plays[k];
+    if (!ATTACK.has(p.kind) || !SIDES.includes(p.side) || !Number.isFinite(p.x)) continue;
+    if (Number.isFinite(now?.t) && Number.isFinite(p.t) && now.t - p.t > window) return null;
+    const ax = p.side === 'home' ? p.x : 100 - p.x;
+    return { side: p.side, ax, level: ax >= 66 ? 'peligro' : ax >= 33 ? 'ataque' : 'salida' };
+  }
+  return null;
+}
+
 // Las jugadas que la vista aún no mostró, en orden y solo las últimas `max`: si la pestaña estuvo oculta no se reproduce
 // todo el atraso de golpe.
 export function newPlays(seen, plays, max = 12) {

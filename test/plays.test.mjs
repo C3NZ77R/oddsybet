@@ -82,6 +82,23 @@ test('normPlays NBA: tiros con zona, marcador y probabilidad de ganar', () => {
   assert.deepEqual(plays.at(-1).score, [117, 138]);
 });
 
+test('normPlays NBA: el rebote defensivo y la falta de la defensa van en el aro del que atacaba', () => {
+  // ESPN copia en el rebote las coordenadas del tiro fallado, medidas desde el aro de quien tiró.
+  const plays = normPlays(fixture('plays-nba.json'), 'basketball');
+  const def = plays.filter((p) => p.label === 'Rebote' && p.x != null);
+  let checked = 0;
+  for (const r of def) {
+    const shot = plays.filter((p) => p.seq < r.seq && p.kind === 'shot' && p.x != null).at(-1);
+    if (shot?.side === r.side) continue; // rebote ofensivo: mismo equipo, mismo marco
+    assert.deepEqual([r.x, r.y], [shot.x, shot.y], `rebote ${r.id}`);
+    checked++;
+  }
+  assert.ok(checked > 30, `rebotes defensivos revisados: ${checked}`);
+  const foul = plays.find((p) => p.id === '40190992119'); // falta de tiro del local: la jugada es en el aro que ataca el visitante
+  assert.equal(foul.side, 'home');
+  assert.ok(foul.x < 50, `x = ${foul.x}`);
+});
+
 test('normPlays NBA: tiros libres y centinelas sin posición', () => {
   const plays = normPlays(fixture('plays-nba.json'), 'basketball');
   const ft = plays.filter((p) => p.kind === 'ft');

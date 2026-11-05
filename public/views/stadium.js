@@ -1,7 +1,7 @@
 // Estadio en vivo (#/<liga>/live/<id>): la cancha en perspectiva con cada jugada que publica ESPN. El balón solo va a
 // posiciones reales; entre jugadas espera. ESPN publica con ~6 min de atraso, así que es una repetición, no la transmisión.
 import { h, raw, esc, teamLogo, errorBox, empty } from '../ui.js';
-import { momentum, runs, heat, shotZones, newPlays } from '../estadio.js';
+import { momentum, runs, heat, shotZones, newPlays, shooters, shotLine, attackNow } from '../estadio.js';
 
 const POLL_MS = 10_000;
 const STEP_MS = 1400; // una jugada de la cola por paso
@@ -10,6 +10,8 @@ const FIRST_QUEUE = 5; // al abrir, repite las últimas jugadas para que se vea 
 const SHOTS = new Set(['goal', 'shot-on', 'shot-off', 'blocked', 'post', 'pen-miss', 'shot']);
 const BASKET = { home: [94.4, 50], away: [5.6, 50] }; // aro que ataca cada equipo (x, y en %)
 const ZONES = [['paint', 'Pintura'], ['mid', 'Media distancia'], ['corner3', 'Triple de esquina'], ['arc3', 'Triple frontal']];
+const ATTACK_ES = { peligro: 'Ataque peligroso', ataque: 'Ataque', salida: 'Sale jugando' };
+const TRAIL = 6; // jugadas recientes con posición que quedan marcadas en la cancha para tocarlas
 
 // Cancha de fútbol en metros (105 × 68) y de básquet en pies (94 × 50); los arcos y aros quedan por fuera con overflow.
 const PITCH = raw(`<svg class="st-lines" viewBox="0 0 105 68" aria-hidden="true">
@@ -57,13 +59,17 @@ function scoreAt(plays, i, sport) {
   return s;
 }
 const lastPlaced = (plays, i) => { for (let k = i; k >= 0; k--) if (plays[k].x != null) return plays[k]; return null; };
+// Cómo terminó un tiro de básquet; en fútbol el tipo de jugada ya lo dice.
+const outcome = (p) => (p.kind === 'shot' ? (p.made ? `entró · +${p.pts}` : 'falló') : p.kind === 'ft' ? (p.made ? 'anotado' : 'fallado') : null);
 
 export default async function stadium(el, { api, leagueInfo: lg, params }) {
   const sport = lg.sport, id = params.id;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let game = null, plays = [], err = null, built = false, stopped = false;
   // Cada carga trae objetos nuevos: la cola y la jugada actual se guardan por `seq`, que es estable entre cargas.
-  let cur = -1, curSeq = null, mode = 'live', layer = 'plays', col = null, feedKey = null;
+  // edgeSeq: hasta dónde llegan las capas (el momento del partido que se ve). Tocar un punto muestra esa jugada sin moverlo,
+  // así los demás tiros no desaparecen.
+  let cur = -1, curSeq = null, edgeSeq = null, mode = 'live', layer = 'plays', col = null, feedKey = null, shooter = '';
   const seen = new Set(), queue = [];
   let pumpTimer = null, step = 0, ball = { x: 50, y: 50 };
   const $ = (s) => el.querySelector(s);
@@ -93,19 +99,23 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
       <section class="card st-arena" style="--home:${col.home};--away:${col.away}">
         <div class="st-stage" data-sport="${sport}">
           <div class="st-field">${sport === 'soccer' ? PITCH : COURT}
+            ${sport === 'soccer' ? h`<div class="st-zone" data-zone hidden></div>` : ''}
             <div class="st-heat" data-heat></div>
             <svg class="st-marks" viewBox="0 0 100 100" preserveAspectRatio="none" data-trail></svg>
             <div class="st-pins" data-pins></div>
             <div class="st-ballpos" data-ball hidden><span class="st-shadow"></span><span class="st-ball"></span></div>
           </div>
           <div class="st-fx" data-fx aria-hidden="true"></div>
+          ${sport === 'soccer' ? h`<p class="st-attack" data-attack hidden title="Según la última jugada de ataque que publicó ESPN"></p>` : ''}
           <p class="st-empty" data-empty hidden></p>
         </div>
         <p class="st-cap" data-cap aria-live="polite"></p>
         <div class="st-tools" role="group" aria-label="Capas de la cancha">
           ${[['plays', 'Jugadas'], ['heat-home', `Calor ${game.home.abbr ?? 'local'}`], ['heat-away', `Calor ${game.away.abbr ?? 'visitante'}`], ['shots', 'Tiros']]
             .map(([k, t]) => h`<button type="button" class="chip-btn" data-layer="${k}" aria-pressed="${k === layer}">${t}</button>`)}
+          ${sport === 'basketball' ? h`<label class="st-shooter" hidden>Jugador <select data-shooter><option value="">Todos</option></select></label>` : ''}
         </div>
+        <p class="hint st-tip">Toca un punto de la cancha para ver esa jugada.</p>
         <div class="st-scrub"><label>Rebobinar <input type="range" min="0" max="0" value="0" data-scrub></label>
           <button type="button" class="btn btn-primary" data-replay>▶ Repetir el partido</button>
           <button type="button" class="btn" data-live hidden>Volver al final</button></div>
@@ -181,20 +191,22 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
     }
   }
 
-  function show(i, animate) {
+  function show(i, animate, inspect = false) {
     const p = plays[i];
     if (!p) return;
     if (!animate) step++; // un salto cancela lo pendiente; en la repetición la celebración del gol anterior sí debe salir
     cur = i;
     curSeq = p.seq;
+    if (!inspect) edgeSeq = p.seq;
     const color = sideCol(p);
     const ago = game.status?.state === 'in' && mode === 'live' && i === plays.length - 1 && !queue.length ? minsAgo(p.at) : null;
     const cap = $('[data-cap]');
     cap.setAttribute('aria-live', mode === 'live' && !queue.length ? 'polite' : 'off'); // durante la repetición o el arrastre, solo se anuncia el final
+    const out = outcome(p);
     cap.innerHTML = h`<b>${clockOf(p, sport)}</b> <span class="st-kind" style="--c:${color}">${p.label}</span>
-      ${p.who ? h`<span>${p.who}</span>` : ''}${p.side ? h` <small>${game[p.side].abbr ?? ''}</small>` : ''}${ago ? h` <small class="st-ago">· hace ~${ago} min</small>` : ''}`;
+      ${p.who ? h`<span>${p.who}</span>` : ''}${out ? h` <span class="st-out${p.made ? ' ok' : ''}">${out}</span>` : ''}${p.side ? h` <small>${game[p.side].abbr ?? ''}</small>` : ''}${ago ? h` <small class="st-ago">· hace ~${ago} min</small>` : ''}`;
     const scored = p.kind === 'goal' || (p.kind === 'shot' && p.made);
-    scoreboard(i, animate && scored ? p.side : null);
+    scoreboard(inspect ? plays.findLastIndex((q) => q.seq <= edgeSeq) : i, animate && scored ? p.side : null); // inspeccionar no cambia el marcador
     if (p.x != null) {
       if (!animate) {
         $('[data-ball]').hidden = false;
@@ -258,9 +270,26 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
     replayLabel();
   }
 
+  // Zona de peligro (fútbol): ilumina el tercio donde ataca el equipo según su última jugada de ataque. Solo con "Jugadas".
+  function paintAttack() {
+    const zone = $('[data-zone]'), badge = $('[data-attack]');
+    if (!zone) return;
+    const a = layer === 'plays' && cur >= 0 ? attackNow(plays, cur) : null;
+    zone.hidden = badge.hidden = !a;
+    if (!a) return;
+    const x = a.side === 'home' ? a.ax : 100 - a.ax; // vuelve a la x absoluta para saber qué tercio pintar
+    zone.style.left = `${(Math.min(2, Math.floor(x / (100 / 3))) * 100) / 3}%`;
+    zone.dataset.dir = a.side === 'home' ? 'right' : 'left';
+    zone.dataset.level = a.level;
+    for (const n of [zone, badge]) n.style.setProperty('--c', col[a.side]);
+    badge.dataset.level = a.level;
+    badge.textContent = `${ATTACK_ES[a.level]} · ${game[a.side].abbr ?? ''}`;
+  }
+
   // ---------- capas y tableros (hasta la jugada que se está viendo: rebobinar también los rebobina) ----------
   function paintLayers() {
-    const upto = plays.slice(0, cur + 1);
+    const edge = edgeSeq == null ? cur : plays.findLastIndex((p) => p.seq <= edgeSeq);
+    const upto = plays.slice(0, Math.max(cur, edge) + 1);
     const heatEl = $('[data-heat]'), pins = $('[data-pins]');
     for (const b of el.querySelectorAll('[data-layer]')) b.setAttribute('aria-pressed', String(b.dataset.layer === layer));
     heatEl.hidden = !layer.startsWith('heat');
@@ -271,21 +300,48 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
       if (heatEl.children.length !== grid.length) heatEl.innerHTML = '<i></i>'.repeat(grid.length);
       grid.forEach((v, k) => { heatEl.children[k].style.opacity = (v * 0.75).toFixed(2); });
     }
+    // Puntos que se pueden tocar: en "Tiros", cada tiro (del jugador elegido, si hay uno); en "Jugadas", el rastro de las últimas.
     for (const n of pins.querySelectorAll('.st-pin')) n.remove();
+    const pin = (p, extra = '') => {
+      const ok = p.kind === 'goal' || (p.kind === 'shot' && p.made), out = outcome(p);
+      const name = `${clockOf(p, sport)} ${p.label}${p.who ? ` de ${p.who}` : ''}${out ? `, ${out}` : ''}`;
+      return `<button type="button" class="st-pin${ok ? ' ok' : ''}${p.seq === curSeq ? ' cur' : ''}" data-goto="${p.seq}" style="left:${p.x}%;top:${p.y}%;--c:${col[p.side] ?? '#fff'};${extra}" aria-label="${esc(name)}" title="${esc(name)}"></button>`;
+    };
     if (layer === 'shots') {
-      pins.insertAdjacentHTML('beforeend', upto.filter((p) => SHOTS.has(p.kind) && p.x != null).map((p) => {
-        const ok = p.kind === 'goal' || (p.kind === 'shot' && p.made);
-        return `<span class="st-pin${ok ? ' ok' : ''}" style="left:${p.x}%;top:${p.y}%;--c:${col[p.side] ?? '#fff'}" title="${esc(p.label)}"></span>`;
-      }).join(''));
+      pins.insertAdjacentHTML('beforeend', upto.filter((p) => SHOTS.has(p.kind) && p.x != null && (!shooter || p.who === shooter)).map((p) => pin(p)).join(''));
+    } else if (layer === 'plays') {
+      const recent = upto.filter((p) => p.x != null && p.side).slice(-TRAIL);
+      pins.insertAdjacentHTML('beforeend', recent.map((p, k) => pin(p, `opacity:${(0.35 + (0.65 * (k + 1)) / recent.length).toFixed(2)}`)).join(''));
+    }
+    paintAttack();
+    const pick = $('[data-shooter]');
+    if (pick) {
+      pick.closest('label').hidden = layer !== 'shots';
+      const list = shooters(plays), key = list.map((s) => `${s.who}:${s.att}`).join('|');
+      if (pick.dataset.key !== key) { // solo cuando hay tiros nuevos: rehacer las opciones cierra el menú abierto
+        pick.dataset.key = key;
+        pick.innerHTML = h`<option value="">Todos</option>${list.map((s) => h`<option value="${s.who}">${s.who} (${game[s.side].abbr}) · ${s.att} tiros</option>`)}`;
+        pick.value = shooter;
+      }
     }
     const zones = $('[data-zones]');
     if (zones) {
       zones.hidden = layer !== 'shots';
       if (layer === 'shots') {
-        const z = { home: shotZones(upto, 'home'), away: shotZones(upto, 'away') };
         const cell = ({ made, att }) => (att ? `${made}/${att} <small>${Math.round((made / att) * 100)}%</small>` : '—');
-        zones.innerHTML = h`<h2>Tiros por zona</h2><table class="st-ztab"><thead><tr><th></th><th style="color:${col.away}">${game.away.abbr}</th><th style="color:${col.home}">${game.home.abbr}</th></tr></thead>
-          <tbody>${ZONES.map(([k, t]) => h`<tr><th>${t}</th><td>${raw(cell(z.away[k]))}</td><td>${raw(cell(z.home[k]))}</td></tr>`)}</tbody></table>`;
+        const me = shooter && shooters(plays).find((s) => s.who === shooter);
+        if (me) {
+          // La planilla de un jugador hasta la jugada que se está viendo: lo que miran las props de puntos y triples.
+          const mine = upto.filter((p) => p.who === shooter), l = shotLine(upto, shooter), z = shotZones(mine, me.side);
+          const pts = mine.reduce((s, p) => s + ((p.kind === 'shot' || p.kind === 'ft') && p.made ? p.pts : 0), 0);
+          zones.innerHTML = h`<h2 style="color:${col[me.side]}">${shooter} <small>${game[me.side].abbr}</small></h2>
+            <p class="st-line"><span>Puntos <b>${pts}</b></span><span>De campo <b>${l.fg.made}/${l.fg.att}</b></span><span>Triples <b>${l.three.made}/${l.three.att}</b></span><span>Libres <b>${l.ft.made}/${l.ft.att}</b></span></p>
+            <table class="st-ztab"><tbody>${ZONES.map(([k, t]) => h`<tr><th>${t}</th><td>${raw(cell(z[k]))}</td></tr>`)}</tbody></table>`;
+        } else {
+          const z = { home: shotZones(upto, 'home'), away: shotZones(upto, 'away') };
+          zones.innerHTML = h`<h2>Tiros por zona</h2><table class="st-ztab"><thead><tr><th></th><th style="color:${col.away}">${game.away.abbr}</th><th style="color:${col.home}">${game.home.abbr}</th></tr></thead>
+            <tbody>${ZONES.map(([k, t]) => h`<tr><th>${t}</th><td>${raw(cell(z.away[k]))}</td><td>${raw(cell(z.home[k]))}</td></tr>`)}</tbody></table>`;
+        }
       }
     }
     paintPulse(upto);
@@ -389,7 +445,12 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
       return;
     }
     pause();
-    show(idxOf(Number(b.dataset.goto)), false);
+    show(idxOf(Number(b.dataset.goto)), false, b.classList.contains('st-pin')); // un punto de la cancha solo se inspecciona
+  });
+  el.addEventListener('change', (e) => {
+    if (!e.target.matches('[data-shooter]')) return;
+    shooter = e.target.value;
+    paintLayers();
   });
   el.addEventListener('input', (e) => {
     if (!e.target.matches('[data-scrub]')) return;
