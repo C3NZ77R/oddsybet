@@ -100,7 +100,8 @@ test('markets: spread en halfLine(-mu) para el local y total en halfLine(total)'
   const sp = pick(ms, 'spread');
   assert.equal(sel(sp, 'Local').line, -5.5);
   assert.equal(sel(sp, 'Visitante').line, 5.5);
-  close(sel(sp, 'Local').p, normalOver(5.2, 12, 5.5));
+  const tie = 1 - normalOver(5.2, 12, 0) - normalOver(-5.2, 12, 0); // margen 0 excluido, como en el ganador
+  close(sel(sp, 'Local').p, normalOver(5.2, 12, 5.5) / (1 - tie));
   const ou = pick(ms, 'ou');
   assert.equal(ou.selections[0].line, 226.5);
   close(sel(ou, 'Más').p, normalOver(226.3, 13.2, 226.5));
@@ -379,4 +380,13 @@ test('mejores apuestas: getPicks marca el pick del partido (≥ 70 %) y devuelve
       if (c < 0) assert.ok(picks.some((p) => p.p < 0.5 && p.raw >= 0.5));
     }
   });
+});
+
+test('básquet: con la línea en ±0.5 el hándicap es el mismo mercado que el ganador (sin empate en los dos)', () => {
+  for (const mu of [0.3, -0.6, 0.45]) {
+    const ms = marketsFor('basketball', { kind: 'normal', mu, sigma: 12, total: 220, sigmaT: 18 });
+    const ml = ms.find((m) => m.key === 'ml').selections[0].p, sp = ms.find((m) => m.key === 'spread').selections[0];
+    assert.equal(Math.abs(sp.line), 0.5);
+    assert.ok(Math.abs(sp.p - ml) < 1e-12, `mu ${mu}: hándicap ${sp.p} contra ganador ${ml}`);
+  }
 });

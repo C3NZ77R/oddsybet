@@ -184,3 +184,11 @@ test('migración del registro: tablas, RLS y purga', () => {
   }
   assert.match(sql, /cron\.schedule\('oddsy-picks-purge', '40 9 \* \* \*'/);
 });
+
+test('activeBets: pagina de a 1 000 hasta una página corta (el tope de PostgREST)', async () => {
+  const row = (i) => ({ id: `b${i}`, device_id: ID, status: 'pendiente', notified: {}, track_selections: [], track_devices: { id: ID, subscription: {} } });
+  const { calls, db } = fake((u) => (u.searchParams.get('offset') === '0' ? Array.from({ length: 1000 }, (_, i) => row(i)) : [row(1000)]));
+  assert.equal((await db.activeBets()).length, 1001);
+  assert.deepEqual(calls.map((c) => c.url.searchParams.get('offset')), ['0', '1000']);
+  assert.equal(calls[0].url.searchParams.get('order'), 'id');
+});

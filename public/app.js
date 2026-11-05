@@ -134,6 +134,7 @@ function importShare(query) {
 async function importBetano(query) {
   const lines = await decodeBetano(query.get('d'));
   const n = Object.keys(lines).length, players = new Set(Object.keys(lines).map((k) => k.split('|')[0])).size;
+  if (n && !window.confirm(`¿Guardar ${n} líneas de Betano? Solo si las trajiste tú con el marcador de Oddsy.`)) { location.replace('#/nba/props'); return; }
   if (n) saveBetano(store, lines);
   toast(n ? `Llegaron ${n} líneas de Betano de ${players} jugadores.` : 'Este enlace no trae líneas de Betano.');
   location.replace('#/nba/props');

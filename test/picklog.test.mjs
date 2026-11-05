@@ -124,6 +124,9 @@ test('tick: la última foto antes del inicio gana y borra el mercado que desapar
   await runTick(deps(db, { board, picks: { [TODAY]: [{ gameId: 'a', x: {}, picks: [pk('dc', 0.77), pk('btts', 0.6, { side: undefined })] }] } }), { now: NOW + 900_000 });
   assert.deepEqual([...db.rows.keys()], ['colombia:a:dc']);
   assert.equal(db.rows.get('colombia:a:dc').p, 0.77);
+  // Una foto entera sin side (vieja de la CDN) no borra lo que ya estaba congelado.
+  await runTick(deps(db, { board, picks: { [TODAY]: [{ gameId: 'a', x: {}, picks: [pk('dc', 0.7, { side: undefined })] }] } }), { now: NOW + 1_800_000 });
+  assert.deepEqual([...db.rows.keys()], ['colombia:a:dc']);
 });
 
 test('tick: cierra con el resultado, anula aplazados y, sin resultado a los 3 días, anula; nunca toca un partido sin terminar', async () => {

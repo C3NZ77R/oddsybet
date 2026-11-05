@@ -115,3 +115,10 @@ test('atLine cotiza el prop en la línea de Betano y edge da la ventaja', () => 
   assert.equal(edge(0.6, 1.83), 0.6 * 1.83 - 1);
   assert.equal(edge(0.6, null), null);
 });
+
+test('atLine: una línea casi segura (Más de 0.5 con media 10) no se cotiza: topaba en 1.01 y dejaba valor', () => {
+  const p = { player: 'X', stat: 'reb', side: 'Over', line: 9.5, kind: 'count', mean: 10, variance: 12, p: 0.5, books: [] };
+  assert.equal(atLine(p, 0.5), null);
+  assert.equal(atLine(p, 0.5, 'Under'), null);
+  assert.ok(atLine(p, 9.5));
+});

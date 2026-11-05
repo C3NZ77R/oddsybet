@@ -104,6 +104,7 @@ export const lineFor = (b, player, stat) => b?.lines[keyOf(player, stat)] ?? nul
 // El prop del servidor llevado a otra línea, con su misma media y varianza.
 export function atLine(p, line, side = p.side) {
   const over = bm.propOver(p.kind, p.mean, p.variance, line);
+  if (over > bm.MAX_P || over < 1 - bm.MAX_P) return null; // casi segura: la cuota topa en 1.01 y deja valor al apostador
   const pr = bm.price(side === 'Over' ? over : 1 - over);
   return { ...p, line, side, p: pr.p, fair: pr.fair, books: [{ key: 'oddsy', title: 'Oddsy', price: pr.oddsy }] };
 }

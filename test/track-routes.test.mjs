@@ -8,10 +8,10 @@ function memDb() {
   const devices = new Map(), bets = [];
   let n = 0;
   return {
-    devices, bets, readsOk: true, bumps: [],
+    devices, bets, readsOk: true, bumps: [], touches: 0,
     async createDevice(d) { const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`; devices.set(id, { id, ...d }); return { id }; },
     async getDevice(id) { return devices.get(id) ?? null; },
-    async touchDevice(id, patch = {}) { Object.assign(devices.get(id), patch); },
+    async touchDevice(id, patch = {}) { this.touches++; Object.assign(devices.get(id), patch, { lastSeenAt: new Date(Date.now()).toISOString() }); },
     async bumpReads(...args) { this.bumps.push(args); return this.readsOk; },
     async createBet(deviceId, meta, selections) { const b = { id: `b${bets.length + 1}`, deviceId, ...meta, status: 'pendiente', notified: {}, selections }; bets.push(b); return b; },
     async listBets(deviceId) { return bets.filter((b) => b.deviceId === deviceId); },
@@ -24,7 +24,7 @@ const g = (id, state, name = null) => ({ id, start: '2026-11-03T02:00:00Z', stat
 const ROSTERS = { 7: [{ id: '3112335', name: 'Nikola Jokić', short: 'N. Jokić', teamId: '7' }], 13: [{ id: '1966', name: 'LeBron James', short: 'L. James', teamId: '13' }] };
 const SUB = { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'p', auth: 'a' }, expirationTime: null };
 
-function setup({ sendOk = true, props = async () => [{ athleteId: '3112335', stat: 'pts', side: 'Over', mean: 26, variance: 40, kind: 'normal' }], priorMs } = {}) {
+function setup({ sendOk = true, props = async () => [{ athleteId: '3112335', stat: 'pts', side: 'Over', mean: 26, variance: 40, kind: 'normal' }], priorMs, now } = {}) {
   const db = memDb(), sent = [], reads = [], ticks = [];
   const track = createTrack({
     db,
@@ -36,6 +36,7 @@ function setup({ sendOk = true, props = async () => [{ athleteId: '3112335', sta
     tickSecret: 'tick-secreto',
     runTick: async () => { ticks.push(1); return { bets: 0, pushes: 0, skippedGames: 0 }; },
     priorMs,
+    now,
   });
   const call = (method, path, { body = null, headers = {}, query = '' } = {}) => track.handle({ method, path, query: new URLSearchParams(query), headers, body });
   async function device() {
@@ -184,4 +185,17 @@ test('POST tick: sin runTick inyectado usa el tick real (aquí sin candado, no h
   const track = createTrack({ db, push: {}, readTicket: null, nba: {}, limits: {}, tickSecret: 's' });
   const r = await track.handle({ method: 'POST', path: 'tick', headers: { 'x-tick-secret': 's' } });
   assert.deepEqual(r, { status: 200, body: { bets: 0, pushes: 0, skippedGames: 0 } });
+});
+
+test('auth: last_seen_at se escribe a lo más una vez al día; la cuota de lecturas cuenta el día del Pacífico (el de Gemini)', async () => {
+  const t = setup({ now: () => Date.parse('2026-11-04T03:00:00Z') }); // 22:00 del 3 en Colombia, 19:00 del 3 en California
+  const headers = await t.device();
+  const before = t.db.touches;
+  await t.call('GET', 'bets', { headers });
+  assert.equal(t.db.touches, before + 1); // sin last_seen_at todavía
+  await t.call('GET', 'bets', { headers });
+  await t.call('GET', 'bets', { headers });
+  assert.equal(t.db.touches, before + 1);
+  await t.call('POST', 'read', { headers, body: { text: 'Jokić Más de 24,5' } });
+  assert.equal(t.db.bumps[0][0], '2026-11-03');
 });

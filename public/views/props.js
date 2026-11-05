@@ -67,7 +67,7 @@ const done = new Map(); // clave -> valor resuelto (null si falló)
 const fresh = (k) => cache.has(k) && Date.now() - cache.get(k).at < TTL;
 function load(k, fn) {
   if (!fresh(k)) {
-    const p = Promise.resolve().then(fn).then(dataOf).catch(() => null).then((v) => (done.set(k, v), v));
+    const p = Promise.resolve().then(fn).then(dataOf).catch(() => (cache.set(k, { at: Date.now() - TTL + 30_000, p }), null)).then((v) => (done.set(k, v), v)); // falló: se reintenta a los 30 s
     cache.set(k, { at: Date.now(), p });
   }
   return cache.get(k).p;
@@ -213,7 +213,8 @@ async function renderList(el, ctx) {
   for (const p0 of props) {
     // Con línea de Betano, el prop pasa a esa línea y lleva su cuota (docs/superpowers/specs/2026-11-04-lineas-betano-design.md).
     const b = Number.isFinite(p0.variance) ? B.lineFor(bt, p0.player, p0.stat) : null;
-    const p = b ? { ...B.atLine(p0, b[0]), betano: p0.side === 'Over' ? b[1] : b[2] } : p0;
+    const a = b && B.atLine(p0, b[0]);
+    const p = a ? { ...a, betano: p0.side === 'Over' ? b[1] : b[2] } : p0;
     const key = propKey(p);
     if (!rowMap.has(key)) rowMap.set(key, { p, key, who: who(p), def: defOf(sport, p.stat, p.market), price: oddsy(p).price });
   }

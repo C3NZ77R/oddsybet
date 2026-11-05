@@ -152,6 +152,7 @@ export default {
         ${msg}`;
     }
 
+    let lastList = '';
     async function paintList() {
       const box = $('[data-list]');
       if (!active()) { box.innerHTML = ''; return; }
@@ -162,7 +163,7 @@ export default {
         listFailed(box, err);
         return;
       }
-      box.innerHTML = h`<h2 id="sgListTitle">Apuestas que sigues</h2>${bets.length ? bets.map((b) => {
+      const html = String(h`<h2 id="sgListTitle">Apuestas que sigues</h2>${bets.length ? bets.map((b) => {
         const sels = b.selections ?? [];
         return h`<article class="card sg-bet">
           <header class="sg-bet-head"><h3>${sels.length > 1 ? `Combinada de ${sels.length}` : sels[0]?.label ?? 'Apuesta'}</h3><span class="sg-st sg-${b.status}">${BET_STATUS[b.status] ?? b.status}</span></header>
@@ -171,7 +172,8 @@ export default {
             ? h`<small>${s.market === 'ml' || s.market === 'spread' ? `diferencia ${s.current > 0 ? '+' : ''}${s.current}` : `lleva ${s.current}`}</small>` : ''}</li>`)}</ul>
           <button type="button" class="btn sm" data-stop="${b.id}">Dejar de seguir</button>
         </article>`;
-      }) : empty('Todavía no sigues ninguna apuesta.')}`;
+      }) : empty('Todavía no sigues ninguna apuesta.')}`);
+      if (html !== lastList) box.innerHTML = lastList = html;
     }
 
     const paintPush = () => { $('[data-push]').innerHTML = pushHtml(pushState(), pushErr); };

@@ -111,9 +111,9 @@ export default {
       if (extras.has(id)) return;
       extras.set(id, null);
       Promise.all([
-        api.props(lg.id, id).then((r) => r.data ?? []).catch(() => []),
-        api.markets(lg.id, id).then((r) => (r.accuracy?.publish === false ? null : mainTotal(r.data?.markets))).catch(() => null),
-      ]).then(([props, total]) => { extras.set(id, { props, total }); paint(); });
+        api.props(lg.id, id).then((r) => r.data ?? []),
+        api.markets(lg.id, id).then((r) => (r.accuracy?.publish === false ? null : mainTotal(r.data?.markets))),
+      ]).then(([props, total]) => { extras.set(id, { props, total }); paint(); }, () => extras.delete(id)); // falló: "sin señales" sería falso
     };
 
     // force: lo pidió el usuario (Ver todas, Reintentar), así que pinta aunque esté en pausa.
@@ -147,10 +147,11 @@ export default {
       if (html === last) return; // nada cambió: no se toca el DOM (el lector de pantalla no pierde su lugar)
       last = html;
       const a = document.activeElement;
-      const at = body.contains(a) ? { sig: a.closest('[data-sig]')?.dataset.sig, name: a.name, more: a.dataset.more, from: a.selectionStart, to: a.selectionEnd } : null;
+      const at = body.contains(a) ? { sig: a.closest('[data-sig]')?.dataset.sig, name: a.name, more: a.dataset.more, href: a.getAttribute('href'), from: a.selectionStart, to: a.selectionEnd } : null;
       body.innerHTML = html;
       const back = at?.more ? body.querySelector(`[data-more="${CSS.escape(at.more)}"]`)
-        : at?.sig && body.querySelector(`[data-sig="${CSS.escape(at.sig)}"] [name="${at.name}"]`);
+        : at?.sig ? body.querySelector(`[data-sig="${CSS.escape(at.sig)}"] [name="${at.name}"]`)
+          : at?.href && body.querySelector(`a[href="${CSS.escape(at.href)}"]`);
       if (back) {
         back.focus();
         if (back.tagName === 'INPUT') back.setSelectionRange(at.from, at.to);

@@ -400,7 +400,8 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
       return;
     }
     if (!built) build();
-    $('[data-err]').innerHTML = err ? String(errorBox(err)) : '';
+    const errHtml = err ? String(errorBox(err)) : '';
+    if ($('[data-err]').dataset.html !== errHtml) { $('[data-err]').innerHTML = errHtml; $('[data-err]').dataset.html = errHtml; }
     const st = game.status ?? {};
     $('[data-status]').innerHTML = st.state === 'in' ? h`<span class="gm-live">En vivo</span> ${st.detail ?? ''}` : h`${st.state === 'post' ? 'Final' : st.detail ?? 'Por empezar'}`;
     // La jugada que se está viendo se vuelve a ubicar por seq: ESPN puede traer la lista más corta o en otro orden.

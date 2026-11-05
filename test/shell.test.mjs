@@ -56,3 +56,10 @@ test('hasUserInput: texto, casilla o lista cambiada cuentan; vacío, radios y de
   assert.equal(hasUserInput(root({ type: 'checkbox', checked: true })), true);
   assert.equal(hasUserInput(null), false);
 });
+
+test('exclusivePairs: en un mercado de varias líneas (tarjetas) la línea va en el id: Más 3.5 y Menos 5.5 pueden ganar juntas', () => {
+  const card = (side, l) => game(side, 'cards_ou', `Tarjetas: total ${l}`);
+  assert.equal(exclusivePairs([card('Más', 3.5), card('Menos', 5.5)]).length, 0); // 4 o 5 tarjetas ganan las dos
+  assert.equal(exclusivePairs([card('Más', 3.5), card('Menos', 3.5)]).length, 1);
+  assert.notEqual(card('Más', 3.5).id, card('Más', 4.5).id); // tocar Más 4.5 no quita Más 3.5 del boleto
+});

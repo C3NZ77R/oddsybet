@@ -65,7 +65,8 @@ function selBtn(g, m, s, ctx, compact = false) {
   const name = selLabel(g, m, s);
   const short = (t) => t.abbr || t.name;
   const matchup = ctx.tennis ? `${short(g.home)} vs ${short(g.away)}` : `${short(g.away)} @ ${short(g.home)}`;
-  const pick = { id: `oddsy:${ctx.league}:${g.id}:${m.key}:${m.label}:${s.name}`, label: `${name} (${m.label}) · ${matchup}`, price: s.oddsy, book: 'oddsy', league: ctx.league, gameId: g.id };
+  // La línea va en el id: un mercado puede tener varias (tarjetas: total 3.5, 4.5, 5.5).
+  const pick = { id: `oddsy:${ctx.league}:${g.id}:${m.key}:${m.label}${s.line != null ? ` ${Math.abs(s.line)}` : ''}:${s.name}`, label: `${name} (${m.label}) · ${matchup}`, price: s.oddsy, book: 'oddsy', league: ctx.league, gameId: g.id };
   ctx.picks.push(pick);
   return `<button type="button" class="gm-sel${compact ? ' gm-sel-sm' : ''}" data-pick="${ctx.picks.length - 1}" aria-pressed="${ctx.store.hasPick(pick.id)}" aria-label="${esc(`${name}: probabilidad ${ui.fmtPct(s.p)}, justa ${ui.fmtOdds(s.fair)}, Oddsy ${ui.fmtOdds(s.oddsy)}. Agregar a Mis picks`)}">${compact ? `<b>${esc(ui.fmtOdds(s.oddsy))}</b></button>` : `
     <b>${esc(name)}</b><small>${esc(ui.fmtPct(s.p))}</small><span>Justa ${esc(ui.fmtOdds(s.fair))} · Oddsy <b>${esc(ui.fmtOdds(s.oddsy))}</b></span></button>`}`;
@@ -289,12 +290,13 @@ async function renderList(root, ctx, lg, state) {
   // Marcadores en vivo: cada 60 s si el día elegido tiene partidos en juego.
   state.timer = setInterval(async () => {
     if (document.hidden || state.paused) return; // pestaña oculta o en pausa: no se gasta red ni se repinta
-    if (!byDate.get(state.date)?.some(isLive)) return;
+    const date = state.date;
+    if (!byDate.get(date)?.some(isLive)) return;
     try {
-      const fresh = dataOf(await api.get('/api/games', { league: lg.id, date: state.date }, { fresh: true }));
+      const fresh = dataOf(await api.get('/api/games', { league: lg.id, date }, { fresh: true }));
       if (state.dead || !fresh?.length) return;
-      byDate.set(state.date, fresh);
-      drawList();
+      byDate.set(date, fresh);
+      if (date === state.date) drawList();
     } catch { /* se reintenta en el siguiente ciclo */ }
   }, REFRESH_MS);
 }
@@ -340,7 +342,7 @@ export function marketTables(d, mk, ctx, trends = {}) {
     <details class="gm-how"><summary>¿Cómo leer estas cuotas?</summary><dl>
       <dt>Probabilidad</dt><dd>Qué tan probable es, según Oddsy.</dd>
       <dt>Justa</dt><dd>La cuota sin margen: 1 dividido por la probabilidad.</dd>
-      <dt>Oddsy</dt><dd>La cuota justa con un margen del 5%.</dd></dl></details>`
+      <dt>Oddsy</dt><dd>La cuota justa con el margen de una casa: 5% en los mercados principales, más en los secundarios y en el marcador exacto, y más en el lado menos probable.</dd></dl></details>`
     + mk.data.markets.map((m, i) => {
       // La tendencia del total va en la línea principal (fútbol tiene 0.5 a 5.5), no en la primera.
       const t = !seen.has(m.key) && (m.key !== 'ou' || m.selections[0].line === main) && trends[m.key];
