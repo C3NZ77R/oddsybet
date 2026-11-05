@@ -1,6 +1,6 @@
 // Estadio en vivo (#/<liga>/live/<id>): la cancha en perspectiva con cada jugada que publica ESPN. El balón solo va a
 // posiciones reales; entre jugadas espera. ESPN publica con ~6 min de atraso, así que es una repetición, no la transmisión.
-import { h, raw, teamLogo, errorBox, empty } from '../ui.js';
+import { h, raw, esc, teamLogo, errorBox, empty } from '../ui.js';
 import { momentum, runs, heat, shotZones, newPlays } from '../estadio.js';
 
 const POLL_MS = 10_000;
@@ -62,10 +62,13 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
   const sport = lg.sport, id = params.id;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   let game = null, plays = [], err = null, built = false, stopped = false;
-  let cur = -1, mode = 'live', layer = 'plays', col = null;
+  // Cada carga trae objetos nuevos: la cola y la jugada actual se guardan por `seq`, que es estable entre cargas.
+  let cur = -1, curSeq = null, mode = 'live', layer = 'plays', col = null, feedKey = '';
   const seen = new Set(), queue = [];
-  let pumpTimer = null, ball = { x: 50, y: 50 };
+  let pumpTimer = null, step = 0, ball = { x: 50, y: 50 };
   const $ = (s) => el.querySelector(s);
+  const idxOf = (seq) => plays.findIndex((p) => p.seq === seq);
+  const later = (fn, ms) => { const my = step; setTimeout(() => { if (!stopped && my === step) fn(); }, ms); }; // se cancela si cambia la jugada
 
   const load = async () => {
     try {
@@ -167,8 +170,9 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
     }
   }
 
+  // En la última jugada manda el marcador oficial: en fútbol contar goles fallaría con definiciones por penales o goles anulados.
   function scoreboard(i, flipSide) {
-    const [a, hm] = i < 0 ? [game.away.score ?? 0, game.home.score ?? 0] : scoreAt(plays, i, sport);
+    const [a, hm] = i < 0 || i === plays.length - 1 ? [game.away.score ?? 0, game.home.score ?? 0] : scoreAt(plays, i, sport);
     for (const [s, v] of [['away', a], ['home', hm]]) {
       const b = $(`[data-s="${s}"]`);
       if (b.textContent === String(v)) continue;
@@ -178,12 +182,16 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
   }
 
   function show(i, animate) {
-    cur = i;
     const p = plays[i];
     if (!p) return;
+    step++;
+    cur = i;
+    curSeq = p.seq;
     const color = sideCol(p);
     const ago = game.status?.state === 'in' && mode === 'live' && i === plays.length - 1 && !queue.length ? minsAgo(p.at) : null;
-    $('[data-cap]').innerHTML = h`<b>${clockOf(p, sport)}</b> <span class="st-kind" style="--c:${color}">${p.label}</span>
+    const cap = $('[data-cap]');
+    cap.setAttribute('aria-live', mode === 'live' && !queue.length ? 'polite' : 'off'); // durante la repetición o el arrastre, solo se anuncia el final
+    cap.innerHTML = h`<b>${clockOf(p, sport)}</b> <span class="st-kind" style="--c:${color}">${p.label}</span>
       ${p.who ? h`<span>${p.who}</span>` : ''}${p.side ? h` <small>${game[p.side].abbr ?? ''}</small>` : ''}${ago ? h` <small class="st-ago">· hace ~${ago} min</small>` : ''}`;
     const scored = p.kind === 'goal' || (p.kind === 'shot' && p.made);
     scoreboard(i, animate && scored ? p.side : null);
@@ -197,8 +205,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
         const target = sport === 'basketball' ? (p.side ? BASKET[p.side] : null) : p.tx != null ? [p.tx, p.ty] : null;
         fly([p.x, p.y], { high: 18, ms: FLY_MS * 0.6 });
         if (target) {
-          setTimeout(() => {
-            if (stopped) return;
+          later(() => {
             trail(p, target);
             fly(scored || sport === 'soccer' ? target : [target[0] + (p.side === 'home' ? -3 : 3), target[1] + 6], { high: sport === 'basketball' ? 90 : 30 });
           }, reduce ? 0 : FLY_MS * 0.6);
@@ -214,9 +221,11 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
       $('[data-ball]').hidden = !last;
       if (last) { ball = { x: last.x, y: last.y }; at($('[data-ball]'), last.x, last.y); }
     }
-    if (animate && p.kind === 'goal') setTimeout(() => !stopped && celebrate(`¡GOL de ${game[p.side]?.abbr ?? ''}!`, color), reduce ? 0 : FLY_MS * 1.4);
-    if (animate && p.kind === 'shot' && p.made && p.pts === 3) setTimeout(() => !stopped && celebrate(`+3 ${game[p.side]?.abbr ?? ''}`, color), reduce ? 0 : FLY_MS * 1.4);
-    $('[data-scrub]').value = i;
+    if (animate && p.kind === 'goal') later(() => celebrate(`¡GOL de ${game[p.side]?.abbr ?? ''}!`, color), reduce ? 0 : FLY_MS * 1.4);
+    if (animate && p.kind === 'shot' && p.made && p.pts === 3) later(() => celebrate(`+3 ${game[p.side]?.abbr ?? ''}`, color), reduce ? 0 : FLY_MS * 1.4);
+    const scrub = $('[data-scrub]');
+    scrub.value = i;
+    scrub.setAttribute('aria-valuetext', `${clockOf(p, sport)} ${p.label}`);
     replayLabel();
     paintLayers();
   }
@@ -229,16 +238,18 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
   // ---------- cola de repetición ----------
   function pump() {
     pumpTimer = null;
-    if (stopped || mode !== 'live' || !queue.length) return replayLabel();
-    const p = queue.shift();
+    let i = -1;
+    while (queue.length && i < 0) i = idxOf(queue.shift()); // una jugada que ESPN quitó en la última carga se salta
+    if (stopped || mode !== 'live' || i < 0) return replayLabel();
     pumpTimer = 0; // marca "repitiendo" mientras show() pinta el botón
-    show(plays.indexOf(p), true);
+    show(i, true);
     if (!queue.length) paintFeed();
     // Un partido entero son ~115 jugadas en fútbol y ~500 en la NBA: con cola larga va al doble de velocidad.
     pumpTimer = setTimeout(pump, reduce ? 600 : queue.length > 20 ? STEP_MS / 2 : STEP_MS);
   }
 
   function pause() {
+    step++; // cancela el segundo tramo del tiro y la celebración pendientes
     mode = 'scrub';
     queue.length = 0;
     clearTimeout(pumpTimer);
@@ -254,15 +265,17 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
     for (const b of el.querySelectorAll('[data-layer]')) b.setAttribute('aria-pressed', String(b.dataset.layer === layer));
     heatEl.hidden = !layer.startsWith('heat');
     if (layer.startsWith('heat')) {
-      const side = layer.slice(5);
+      const side = layer.slice(5), grid = heat(upto, side).flat();
       heatEl.style.setProperty('--c', col[side]);
-      heatEl.innerHTML = heat(upto, side).flatMap((row) => row.map((v) => `<i style="opacity:${(v * 0.75).toFixed(2)}"></i>`)).join('');
+      // Las celdas difuminadas se crean una vez: en la repetición solo cambia su opacidad (rehacerlas pesa en el celular).
+      if (heatEl.children.length !== grid.length) heatEl.innerHTML = '<i></i>'.repeat(grid.length);
+      grid.forEach((v, k) => { heatEl.children[k].style.opacity = (v * 0.75).toFixed(2); });
     }
     for (const n of pins.querySelectorAll('.st-pin')) n.remove();
     if (layer === 'shots') {
       pins.insertAdjacentHTML('beforeend', upto.filter((p) => SHOTS.has(p.kind) && p.x != null).map((p) => {
         const ok = p.kind === 'goal' || (p.kind === 'shot' && p.made);
-        return `<span class="st-pin${ok ? ' ok' : ''}" style="left:${p.x}%;top:${p.y}%;--c:${col[p.side] ?? '#fff'}" title="${p.label}"></span>`;
+        return `<span class="st-pin${ok ? ' ok' : ''}" style="left:${p.x}%;top:${p.y}%;--c:${col[p.side] ?? '#fff'}" title="${esc(p.label)}"></span>`;
       }).join(''));
     }
     const zones = $('[data-zones]');
@@ -282,20 +295,21 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
     const box = $('[data-pulse]');
     if (sport === 'soccer') {
       const m = momentum(upto), max = Math.max(1, ...m.flatMap((b) => [b.home, b.away]));
-      const w = 100 / m.length, now = upto.at(-1)?.t ?? 0;
+      const w = 100 / m.length, now = upto.at(-1)?.t ?? 0, span = m.length * 300; // con descuento o prórroga hay más de 18 tramos
+      const nowX = Math.min(100, (now / span) * 100);
       const bars = m.map((b, i) => `<rect x="${i * w + 0.4}" y="${50 - (b.home / max) * 46}" width="${w - 0.8}" height="${(b.home / max) * 46}" fill="${col.home}"/>`
         + `<rect x="${i * w + 0.4}" y="50" width="${w - 0.8}" height="${(b.away / max) * 46}" fill="${col.away}"/>`).join('');
       const last3 = m.filter((b) => b.t0 <= now).slice(-3), hp = last3.reduce((s, b) => s + b.home, 0), ap = last3.reduce((s, b) => s + b.away, 0);
       const who = hp + ap < 2 ? 'Partido parejo en los últimos 15 minutos.' : `En los últimos 15 minutos presiona más ${hp >= ap ? game.home.abbr : game.away.abbr}.`;
       box.innerHTML = h`<h2>Quién presiona</h2><p class="hint">${who}</p>
         <svg class="st-chart" viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Presión por tramos de 5 minutos: ${game.home.abbr} arriba, ${game.away.abbr} abajo">${raw(bars)}
-        <line x1="0" y1="50" x2="100" y2="50" class="mid"/><line x1="${Math.min(100, (now / 5400) * 100)}" y1="0" x2="${Math.min(100, (now / 5400) * 100)}" y2="100" class="now"/></svg>
-        <p class="st-axis"><span>0'</span><span>45'</span><span>90'</span></p>
+        <line x1="0" y1="50" x2="100" y2="50" class="mid"/><line x1="${nowX}" y1="0" x2="${nowX}" y2="100" class="now"/></svg>
+        <p class="st-axis">${raw([[0, "0'"], [2700, "45'"], [5400, "90'"]].map(([t, txt]) => `<span style="left:${(t / span) * 100}%">${txt}</span>`).join(''))}</p>
         <p class="st-legend"><span style="--c:${col.home}">${game.home.abbr} arriba</span><span style="--c:${col.away}">${game.away.abbr} abajo</span></p>`;
       return;
     }
     const wp = upto.filter((p) => p.wp != null);
-    const total = Math.max(2880, plays.at(-1)?.t ?? 0);
+    const total = Math.max(lg.id === 'wnba' ? 2400 : 2880, plays.at(-1)?.t ?? 0); // tiempo reglamentario: WNBA 4×10 min, NBA 4×12
     const pt = (p) => `${((p.t ?? 0) / total * 100).toFixed(2)},${((1 - p.wp) * 100).toFixed(2)}`;
     const top = runs(upto).sort((a, b) => b.pts - a.pts).slice(0, 3);
     const label = top.map((r) => {
@@ -315,7 +329,10 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
 
   function paintFeed() {
     const list = plays.slice(Math.max(0, plays.length - 8)).reverse();
-    $('[data-feed]').innerHTML = list.length ? h`${list.map((p) => h`<li><button type="button" data-goto="${plays.indexOf(p)}" style="--c:${sideCol(p)}">
+    const key = list.map((p) => `${p.seq}:${p.id}:${p.label}`).join('|');
+    if (key === feedKey) return; // sin cambios no se repinta: quien navega con teclado no pierde el foco cada 10 s
+    feedKey = key;
+    $('[data-feed]').innerHTML = list.length ? h`${list.map((p) => h`<li><button type="button" data-goto="${p.seq}" style="--c:${sideCol(p)}">
       <b>${clockOf(p, sport)}</b> <span class="st-kind">${p.label}</span> ${p.who ?? ''}${p.side ? h` <small>${game[p.side].abbr ?? ''}</small>` : ''}</button></li>`)}` : h`<li class="empty">Sin jugadas todavía.</li>`;
   }
 
@@ -330,9 +347,12 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
     $('[data-err]').innerHTML = err ? String(errorBox(err)) : '';
     const st = game.status ?? {};
     $('[data-status]').innerHTML = st.state === 'in' ? h`<span class="gm-live">En vivo</span> ${st.detail ?? ''}` : h`${st.state === 'post' ? 'Final' : st.detail ?? 'Por empezar'}`;
+    // La jugada que se está viendo se vuelve a ubicar por seq: ESPN puede traer la lista más corta o en otro orden.
+    if (curSeq != null) cur = plays.findLastIndex((p) => p.seq <= curSeq);
     const scrub = $('[data-scrub]');
     scrub.max = Math.max(0, plays.length - 1);
     scrub.disabled = plays.length < 2;
+    for (const b of el.querySelectorAll('[data-layer],[data-replay]')) b.disabled = !plays.length;
     const placed = plays.some((p) => p.x != null);
     const msg = $('[data-empty]');
     msg.hidden = placed;
@@ -340,7 +360,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
     const fresh = newPlays(seen, plays, seen.size ? 12 : FIRST_QUEUE);
     for (const p of plays) seen.add(p.id);
     if (cur < 0 && plays.length) show(Math.max(0, plays.length - 1 - fresh.length), false); // arranca justo antes de lo que va a repetir
-    queue.push(...fresh);
+    queue.push(...fresh.map((p) => p.seq));
     paintFeed();
     if (mode === 'live' && !pumpTimer) pump(); // si ya está repitiendo, lo nuevo espera su turno en la cola
     if (cur < 0) { scoreboard(-1); paintLayers(); }
@@ -357,7 +377,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
       mode = 'live';
       $('[data-live]').hidden = true;
       queue.length = 0;
-      queue.push(...plays.slice(from === 0 ? 1 : from));
+      queue.push(...plays.slice(from === 0 ? 1 : from).map((p) => p.seq));
       return pump();
     }
     if (b.hasAttribute('data-live')) {
@@ -368,7 +388,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
       return;
     }
     pause();
-    show(Number(b.dataset.goto), false);
+    show(idxOf(Number(b.dataset.goto)), false);
   });
   el.addEventListener('input', (e) => {
     if (!e.target.matches('[data-scrub]')) return;

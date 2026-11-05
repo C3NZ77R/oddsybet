@@ -88,7 +88,11 @@
 .st-chart .q { stroke: var(--line); stroke-dasharray: 2 4; }
 .st-chart .now { stroke: var(--text); stroke-dasharray: 3 3; }
 .st-chart .wp { fill: none; stroke: var(--teal); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.st-axis { display: flex; justify-content: space-between; margin: 2px 0 0; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+/* Marcas en su minuto real: con descuento el gráfico pasa de 90' y 45' ya no está en el centro. */
+.st-axis { position: relative; height: 16px; margin: 2px 0 0; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.st-axis span { position: absolute; transform: translateX(-50%); }
+.st-axis span:first-child { transform: none; }
+.st-axis span:last-child { transform: translateX(-100%); }
 .st-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 .st-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 3px; background: var(--c); vertical-align: -1px; }
 .st-runs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }

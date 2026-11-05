@@ -47,6 +47,9 @@ test('normPlays fútbol: "wins a free kick" es un tiro libre del equipo que lo g
   assert.equal(fk.side, 'away'); // Everton
   assert.deepEqual([fk.x, fk.y], [foul.x, foul.y]);
   assert.deepEqual([foul.who, fk.who], ['Harvey Barnes', "Jake O'Brien"]); // el tiro libre es del que recibió la falta
+  assert.equal(fk.id, `${foul.id}-fk`); // ESPN repite el play.id: sin sufijo, la repetición saltaría el tiro libre
+  assert.match(fk.text, /wins a free kick/);
+  assert.equal(new Set(plays.map((p) => p.id)).size, plays.length);
   const wins = json.commentary.filter((c) => /wins a free kick/i.test(c.text ?? c.play?.text ?? '')).length;
   assert.equal(plays.filter((p) => p.kind === 'free-kick').length, wins);
 });
