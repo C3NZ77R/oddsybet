@@ -284,7 +284,7 @@ test('registro: la vista pone la tarjeta y la ★; un pick bajo 50 % no se muest
   const s = String(el.innerHTML);
   assert.match(s, /Ayer · 7 de 10/);
   assert.match(s, /★/);
-  assert.match(s, /Pick del partido/);
+  assert.match(s, /Mejor predicción del partido/);
   assert.doesNotMatch(s, /Gana Millonarios/); // el de 45 % no se muestra
   const el2 = {};
   await view.render(el2, { api: api(async () => { throw new Error('caído'); }), leagueInfo: { id: 'colombia', title: 'Liga BetPlay' } });

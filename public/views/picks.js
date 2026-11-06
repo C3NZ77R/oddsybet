@@ -23,7 +23,7 @@ function gameCard(g, picks) {
     <table class="tbl"><caption class="sr-only">Mejores apuestas de ${g.home?.name} contra ${g.away?.name}</caption>
       <thead><tr><th scope="col">Apuesta</th><th scope="col">Probabilidad</th><th scope="col">Cuota mínima</th><th scope="col">Se cumplió</th></tr></thead>
       <tbody>${picks.map((p) => h`<tr><td>${star(p)}${pickText(p, g)}</td><td>${fmtPct(p.p, 0)}</td><td><b>${fmtOdds(p.minOdds)}</b></td><td>${recordText(p.record)}</td></tr>`)}</tbody>
-    </table>${picks.some((p) => p.featured) ? h`<p class="hint">★ Pick del partido: es el que cuenta en el registro de Oddsy.</p>` : ''}</section>`;
+    </table>${picks.some((p) => p.featured) ? h`<p class="hint">★ Mejor predicción del partido (la de mayor probabilidad): es la que cuenta en el registro de Oddsy.</p>` : ''}</section>`;
 }
 
 // ---------- registro de Oddsy ----------
@@ -45,13 +45,13 @@ function learnText(m) {
 
 export function recordHtml(r) {
   if (!r) return '';
-  const intro = h`<p class="hint">Guardamos cada pick ★ antes del partido y lo cerramos con el resultado de ESPN. No borramos los perdidos.</p>`;
+  const intro = h`<p class="hint">De cada partido cuenta una sola apuesta: la ★ mejor predicción, la de mayor probabilidad. La guardamos antes de que empiece y la cerramos con el resultado de ESPN. No borramos las perdidas.</p>`;
   if (!r.since) return h`<section class="card pk-record"><h2>Registro de Oddsy</h2>${intro}<p>El registro empieza con el próximo partido que tenga pick.</p></section>`;
   const day = r.day;
   const g = (p) => ({ home: { name: p.home }, away: { name: p.away } });
   const list = day ? h`<ul class="pk-list">${day.picks.map((p) => {
     const [mark, label] = MARK[p.status] ?? MARK.pendiente;
-    return h`<li class="pk-${p.status}"><span class="pk-mark" aria-hidden="true">${mark}</span> <span class="sr-only">${label}:</span> ${p.home} vs ${p.away} · ${pickText(p, g(p))} · ${fmtPct(p.p, 0)}${p.score ? ` · ${p.score}` : ''}${p.reason && p.status !== 'ganada' ? h` <small>${p.reason}</small>` : ''}</li>`;
+    return h`<li class="pk-${p.status}"><span class="pk-mark" aria-hidden="true">${mark}</span> <span class="sr-only">${label}:</span> ★ ${p.home} vs ${p.away} · ${pickText(p, g(p))} · ${fmtPct(p.p, 0)}${p.score ? ` · ${p.score}` : ''}${p.reason && p.status !== 'ganada' ? h` <small>${p.reason}</small>` : ''}</li>`;
   })}</ul>` : '';
   const totals = [totalLine('Últimos 7 días', r.windows?.[0]), totalLine('Últimos 30 días', r.windows?.[1]), totalLine('Todos los picks de la lista (30 días)', r.all)];
   const started = !day && totals.every((t) => !t) ? h`<p>El registro empezó el ${fmtDay(r.since)}. El primer resultado sale cuando termine el primer partido con pick.</p>` : '';

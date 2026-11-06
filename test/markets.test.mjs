@@ -358,9 +358,9 @@ test('mejores apuestas: side es la posición en el mercado completo, aunque publ
   assert.equal(away.side, 2);
 });
 
-test('mejores apuestas: getPicks marca el pick del partido (≥ 70 %) y devuelve también los que el ajuste dejó bajo 50 %', async () => {
+test('mejores apuestas: getPicks marca como pick del partido la de mayor probabilidad (≥ 50 %) y devuelve también los que el ajuste dejó bajo 50 %', async () => {
   const { getPicks, FEATURED_MIN } = await import('../lib/markets.mjs');
-  assert.equal(FEATURED_MIN, 0.7);
+  assert.equal(FEATURED_MIN, 0.5);
   const day = (d) => new Date(Date.UTC(2026, 0, 3 + 7 * d, 19)).toISOString();
   const ids = ['1', '2', '3', '4'];
   const events = [];
@@ -372,9 +372,10 @@ test('mejores apuestas: getPicks marca el pick del partido (≥ 70 %) y devuelve
   await withEspn(leagueRoute('conmebol.libertadores', events, [g]), async () => {
     const plain = (await getPicks('libertadores', { date: '20260411' })).data[0];
     assert.deepEqual(plain.x, { few: 1, abs: 0 }); // en pre, contra hoy: el último partido de la liga fue hace meses
-    for (const [c, featured] of [[1, true], [-1, false]]) {
+    for (const c of [1, -1]) {
       const { picks } = (await getPicks('libertadores', { date: '20260411', model: shift(c) })).data[0];
-      assert.equal(Boolean(picks[0].featured), featured, `c = ${c}: ${picks[0].p}`);
+      assert.equal(Boolean(picks[0].featured), picks[0].p >= FEATURED_MIN, `c = ${c}: ${picks[0].p}`);
+      assert.ok(picks[0].p >= FEATURED_MIN, 'el partido tiene pick del partido'); // un partido con apuestas visibles nunca queda sin ★
       assert.ok(picks.slice(1).every((p) => !p.featured));
       for (let i = 1; i < picks.length; i++) assert.ok(picks[i].p <= picks[i - 1].p);
       if (c < 0) assert.ok(picks.some((p) => p.p < 0.5 && p.raw >= 0.5));
