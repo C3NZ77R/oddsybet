@@ -303,7 +303,7 @@ export default {
             kind: 'player', cat: playerCat(ins, split), split, text: ins.text, side, pct: pctOf(ins), k: ins.k, n: ins.n ?? 0,
             price: top?.price ?? null, fair: top?.fair ?? null, book: top?.book ?? null, start: g?.start ?? p.start ?? null, gameId: p.gameId ?? null,
             gameLabel: matchup(g, p), player: p.player, teams: teamAbbr ? [teamAbbr] : [], teamAbbr, statKey: p.stat, statLabel: sName,
-            name: a.name ?? p.player, img: H(ui.headshot(a)), href: `#/${league}/props/${propKey(kp)}`, propKey: propKey(kp),
+            name: a.name ?? p.player, img: H(ui.headshot(a, { league })), href: `#/${league}/props/${propKey(kp)}`, propKey: propKey(kp),
             outcome: `${SIDE[side] ?? side} ${line} ${sName}`, pickId: propKey(kp), pickLabel: `${p.player} ${SIDE[side] ?? side} ${line} ${sName}`,
           });
         }

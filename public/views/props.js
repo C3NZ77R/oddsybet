@@ -152,7 +152,7 @@ function playerSearch(root, ctx, defaultStat) {
       try { list = dataOf(await ctx.api.search(ctx.league, q)) ?? []; } catch (err) { if (mine === seq) out.innerHTML = str(ui.errorBox(err)); return; }
       if (mine !== seq || !root.isConnected) return;
       out.innerHTML = list.length
-        ? `<p class="pp-muted">Ábrelo y pon tu propia línea:</p><ul class="pp-results">${list.slice(0, 8).map((a) => `<li><a href="#/${esc(ctx.league)}/props/${esc(propKey({ athleteId: a.id, player: a.name, stat: defaultStat, line: null, side: 'Over', gameId: null }))}">${str(ui.headshot(a, { size: 32 }))}<span><b>${esc(a.name)}</b><small>${esc([a.teamAbbr, a.pos].filter(Boolean).join(' · '))}</small></span></a></li>`).join('')}</ul>`
+        ? `<p class="pp-muted">Ábrelo y pon tu propia línea:</p><ul class="pp-results">${list.slice(0, 8).map((a) => `<li><a href="#/${esc(ctx.league)}/props/${esc(propKey({ athleteId: a.id, player: a.name, stat: defaultStat, line: null, side: 'Over', gameId: null }))}">${str(ui.headshot(a, { size: 32, league: ctx.league }))}<span><b>${esc(a.name)}</b><small>${esc([a.teamAbbr, a.pos].filter(Boolean).join(' · '))}</small></span></a></li>`).join('')}</ul>`
         : '<p class="pp-muted">ESPN no encontró a ningún jugador con ese nombre.</p>';
     }, 350);
   });
@@ -272,7 +272,7 @@ async function renderList(el, ctx) {
     const log = logOf(r), g = gameOf(r), s = sides(r);
     const team = s?.team?.abbr ?? log?.athlete?.teamAbbr ?? (typeof r.p.team === 'string' ? r.p.team : r.p.team?.abbr) ?? '';
     const match = g?.home ? `${g.away.abbr} @ ${g.home.abbr}` : '';
-    return `<a class="pp-pl" href="#/${esc(league)}/props/${esc(r.key)}">${str(ui.headshot(log?.athlete ?? { name: r.p.player }, { size: 36 }))}<span><b>${esc(r.p.player)}</b><small>${esc([team, match].filter(Boolean).join(' · '))}</small><span>${esc(propText(r.p.side, r.p.line, r.def, r.p.stat))}</span></span></a>`;
+    return `<a class="pp-pl" href="#/${esc(league)}/props/${esc(r.key)}">${str(ui.headshot(log?.athlete ?? { id: r.p.athleteId, name: r.p.player }, { size: 36, league }))}<span><b>${esc(r.p.player)}</b><small>${esc([team, match].filter(Boolean).join(' · '))}</small><span>${esc(propText(r.p.side, r.p.line, r.def, r.p.stat))}</span></span></a>`;
   }
   function oppCell(r) {
     const s = sides(r);
@@ -505,7 +505,7 @@ async function renderDetail(el, ctx) {
   el.innerHTML = `<div class="pp pp-detail">
     <a class="pp-back" href="#/${esc(league)}/props">← Props</a>
     <section class="pp-dhead">
-      <div class="pp-who">${str(ui.headshot(athlete, { size: 56 }))}<div><h1>${esc(pk.player)}</h1>
+      <div class="pp-who">${str(ui.headshot(athlete, { size: 56, league: ctx.league }))}<div><h1>${esc(pk.player)}</h1>
         <p class="pp-muted">${esc([athlete.pos, team].filter(Boolean).join(' · '))}${gd?.home ? ` · ${esc(`${gd.away.abbr} @ ${gd.home.abbr}`)} · ${esc(ui.when(gd.start))}` : ' · Sin partido próximo'}</p></div></div>
       <div class="pp-hctl" data-hctl></div>
       <label class="pp-field pp-line">Tu línea <input type="number" step="0.5" min="0" inputmode="decimal" data-line value="${esc(s.line)}"></label>

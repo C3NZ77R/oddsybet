@@ -8,6 +8,7 @@
 //   se insertan con append(), no dentro de h`...`.
 import { decimalToAmerican } from './betmath.js';
 import { store } from './store.js';
+import { leagueById } from './leagues.js';
 
 const SAFE = Symbol.for('oddsy.safe');
 class Safe {
@@ -123,7 +124,9 @@ function avatar(url, ini, size, cls, color) {
   return h`<img class="${cls}" src="${u}" alt="" width="${size}" height="${size}" loading="lazy" decoding="async" data-fallback="${ini}" data-av="${bg}">`;
 }
 export const teamLogo = (team, { size = 24 } = {}) => avatar(team?.logo, (team?.abbr || initials(team?.name)).slice(0, 4), size, 'team-logo', team?.color);
-export const headshot = (athlete, { size = 40 } = {}) => avatar(athlete?.headshot, initials(athlete?.name), size, 'headshot');
+// Sin foto en los datos, se arma la de ESPN con el id del jugador (si falla, quedan las iniciales).
+const espnFace = (id, league) => { const sp = leagueById(league)?.sport; return id && sp ? `https://a.espncdn.com/i/headshots/${league === 'wnba' ? 'wnba' : sp === 'basketball' ? 'nba' : sp}/players/full/${id}.png` : null; };
+export const headshot = (athlete, { size = 40, league } = {}) => avatar(athlete?.headshot ?? espnFace(athlete?.id, league), initials(athlete?.name), size, 'headshot');
 
 if (typeof document !== 'undefined') {
   // Si la imagen externa falla, se cambia por un círculo con iniciales.

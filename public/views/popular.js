@@ -133,7 +133,7 @@ export default {
       const hit = r.hit;
       return `<article class="pop-card">
         <a class="pop-link" href="#/${esc(league)}/props/${esc(propKey(p))}">
-          <span class="pop-img">${H(ui.headshot(a, { size: 48 }))}${team ? `<span class="pop-badge">${H(ui.teamLogo(team, { size: 18 }))}</span>` : ''}</span>
+          <span class="pop-img">${H(ui.headshot(a, { size: 48, league }))}${team ? `<span class="pop-badge">${H(ui.teamLogo(team, { size: 18 }))}</span>` : ''}</span>
           <span class="pop-main">
             <small>${esc([matchup(g, p), g?.start || p.start ? ui.when(g?.start ?? p.start) : ''].filter(Boolean).join(' · '))}</small>
             <b>${esc(`${p.player} - ${statName(statDef(lg.sport, p), p)} ${SIDE[p.side] ?? p.side} ${p.line}`)}</b>
