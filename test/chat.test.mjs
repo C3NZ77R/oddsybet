@@ -32,3 +32,11 @@ test('rateOk corta después de 20 por minuto', () => {
   assert.equal(res.filter(Boolean).length, 20);
   assert.ok(rateOk('1.2.3.4', t + 61_000));
 });
+
+test('chat prueba el modelo de respaldo si el principal da 503', async () => {
+  const urls = [];
+  const fetch = async (url) => { urls.push(url); return urls.length === 1 ? { ok: false, status: 503, text: async () => 'busy' } : ok('Posible')(); };
+  const r = await chat({ messages: [{ role: 'user', text: 'hola' }] }, { key: 'K', fetch });
+  assert.equal(r.reply, 'Posible');
+  assert.equal(urls.length, 2);
+});
