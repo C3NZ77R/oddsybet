@@ -98,8 +98,8 @@ export default {
       .filter(([g, ps]) => g?.status?.state === 'pre' && ps.length).sort(([a], [b]) => a.start.localeCompare(b.start));
     el.innerHTML = h`<div data-record>${recordHtml(record)}</div><header class="view-head"><div><h1>Mejores apuestas · ${lg.title}</h1>
       <p class="hint">Lo más probable de cada partido, de hoy a pasado mañana. Apuesta solo si tu casa paga <b>la cuota mínima o más</b>; si paga menos, pierdes plata a la larga. «Se cumplió» es cuántas veces acertó esa apuesta la temporada pasada.</p></div></header>
-      ${acc?.publish === false ? empty('Todavía no mostramos apuestas en esta liga: Oddsy aún no predice mejor que usar los resultados de la temporada pasada.')
-        : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps]) => gameCard(g, ps))}` : empty('No hay partidos próximos con apuestas de 50% o más.')}`;
+      ${acc?.publish === false ? empty('Aún no mostramos apuestas en esta liga: Oddsy todavía no supera a los resultados de la temporada pasada.')
+        : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps]) => gameCard(g, ps))}` : empty('No hay partidos próximos con apuestas de al menos 50%.')}`;
     el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, 8, record, `${location.origin}${location.pathname}#/${lg.id}/picks`))}`, '_blank', 'noopener'));
     // Si se cambió de vista mientras tanto, el hueco ya no está en la página y no se toca nada.
     if (first === LATE) recordP.then((rec) => {

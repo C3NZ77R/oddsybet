@@ -233,7 +233,7 @@ export default {
       const rest = shown.length - page;
       listEl.innerHTML = shown.length
         ? shown.slice(0, page).map((it, i) => card(it, i, inSlip)).join('') + (rest > 0 ? `<button type="button" class="ins-more">Mostrar más (${rest})</button>` : '')
-        : prog.loading ? '' : H(ui.empty(items.length ? 'Ninguna tendencia cumple estos filtros.' : 'No hay tendencias para los próximos partidos de esta liga.'));
+        : prog.loading ? '' : H(ui.empty(items.length ? 'Ninguna tendencia cumple los filtros.' : 'No hay tendencias para los próximos partidos.'));
       // Sin props de jugador (solo cubren los próximos 3 partidos de hoy) quedan solo los insights de equipo.
       if (!prog.loading && !prog.props) listEl.insertAdjacentHTML('afterbegin', `<p class="hint">Por ahora solo hay tendencias de equipos. Las de jugadores salen para los 3 próximos partidos de hoy; para otro, ábrelo en <a href="#/${esc(league)}/games">Partidos</a>.</p>`);
       root.querySelector('.ins-progress').innerHTML = prog.loading

@@ -144,7 +144,7 @@ async function sharePicks() {
   const url = `${location.origin}${location.pathname}#/share?p=${encodePicks(store.get('picks'))}`;
   try {
     await navigator.clipboard.writeText(url);
-    toast('Enlace copiado. Quien lo abra verá estos picks en su boleto.');
+    toast('Enlace copiado. Quien lo abra recibirá estos picks.');
   } catch {
     window.prompt('Copia este enlace para compartir tus picks:', url);
   }
@@ -171,7 +171,7 @@ function renderSlip() {
   $('#fabCount').textContent = picks.length;
   const body = $('#slipBody'), foot = $('#slipFoot');
   if (!picks.length) {
-    body.innerHTML = empty('Tu boleto está vacío. Toca una cuota o el botón + en Props, Partidos o Tendencias para agregar picks.');
+    body.innerHTML = empty('Aún no tienes picks. Toca una cuota o el botón + en Props, Partidos o Tendencias.');
     foot.innerHTML = '';
     return;
   }
@@ -196,7 +196,7 @@ function renderSlip() {
       <div><dt>Cuota combinada</dt><dd>${fmtOdds(total)}</dd></div>
       <div><dt>Probabilidad implícita en la cuota, con el margen de Oddsy</dt><dd>${fmtPct(total ? 1 / total : null, 1)}</dd></div>
     </dl>
-    <p class="slip-note">La cuota combinada es solo una referencia. Si juntas picks del mismo partido, unos dependen de otros, y cada casa tiene sus propias reglas para combinarlos.</p>
+    <p class="slip-note">La cuota combinada es solo una referencia: picks del mismo partido se influyen entre sí y cada casa combina a su manera.</p>
     <p class="slip-note"><b>${RG_LINE}</b></p>
     <div class="slip-actions"><button type="button" class="btn btn-primary" data-share>Compartir</button><button type="button" class="btn" data-share-wa>WhatsApp</button><button type="button" class="btn" data-clear>Vaciar</button></div>`;
 }
@@ -261,7 +261,7 @@ $('#slip').addEventListener('click', (e) => {
   if (e.target.closest('[data-share-wa]')) return shareWhatsApp();
   if (e.target.closest('[data-share]')) return sharePicks();
   if (e.target.closest('[data-drop-shared]')) { store.set('picks', store.get('picks').filter((p) => !p.shared)); $('#slipTitle').focus(); return; }
-  if (e.target.closest('[data-clear]') && window.confirm('¿Vaciar todos los picks del boleto?')) store.set('picks', []);
+  if (e.target.closest('[data-clear]') && window.confirm('¿Vaciar el boleto?')) store.set('picks', []);
 });
 wide.addEventListener('change', syncSlip);
 

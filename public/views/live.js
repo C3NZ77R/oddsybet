@@ -71,7 +71,7 @@ function gameCard(g, x, sigs, sport, inputs, open, league) {
   const wp = g.winProb, stop = stopOn(g);
   const all = open.has(g.id), shown = all ? sigs : sigs.slice(0, MAX_SIGS);
   const waiting = !x ? 'Cargando las líneas de Oddsy de este partido…'
-    : g.progress < 0.1 ? 'Todavía es temprano para leer el ritmo: las señales salen después del 10% del partido.'
+    : g.progress < 0.1 ? 'Aún es temprano: las señales salen después del 10% del partido.'
       : 'Sin señales por ahora: todos van al ritmo esperado.';
   return h`<section class="card lv-game">
     <header class="lv-head">

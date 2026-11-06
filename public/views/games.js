@@ -13,7 +13,7 @@ const SURF = { hard: 'Dura', clay: 'Arcilla', grass: 'Hierba' };
 const REFRESH_MS = 60_000;
 const REC_ORDER = ['overall', 'home', 'road', 'vsconf', 'vsdiv'];
 const REC_LABEL = { overall: 'Total', home: 'Local', road: 'Visita', vsconf: 'Conferencia', vsdiv: 'División' };
-const NO_PUBLISH = 'Todavía no mostramos cuotas en esta liga: Oddsy aún no predice mejor que usar los resultados de la temporada pasada';
+const NO_PUBLISH = 'Aún no mostramos cuotas en esta liga: Oddsy todavía no supera a los resultados de la temporada pasada';
 
 let ui = baseUi; // ctx.ui de la vista montada (solo hay una a la vez)
 const esc = (s) => ui.esc(s ?? '');
@@ -24,8 +24,8 @@ const lineTxt = (m, s) => (m.key.startsWith('ou') ? s.line : signed(s.line)); //
 // Mercado principal de la tarjeta: 1X2 en fútbol, ganador en el resto.
 export const mainMarket = (markets) => markets?.find((m) => m.key === '1x2') ?? markets?.find((m) => m.key === 'ml') ?? null;
 export const accText = (acc) => (acc?.brier != null
-  ? `Qué tan bien predice Oddsy: Brier ${acc.brier.toFixed(3)} en ${acc.n} partidos ya jugados. Mientras más bajo, mejor; adivinar con los resultados de la temporada pasada da ${acc.baseline?.brier?.toFixed(3) ?? '—'}.`
-  : 'Qué tan bien predice Oddsy: todavía no lo hemos medido en esta liga.');
+  ? `Precisión de Oddsy: Brier ${acc.brier.toFixed(3)} en ${acc.n} partidos jugados (menos es mejor). Con solo los resultados de la temporada pasada: ${acc.baseline?.brier?.toFixed(3) ?? '—'}.`
+  : 'Precisión de Oddsy: aún sin medir en esta liga.');
 
 // Qué se apuesta en cada mercado (claves de lib/markets.mjs), en palabras simples. n = primera selección, t = su línea.
 const ORD = { 3: 'tercer', 4: 'cuarto', 5: 'quinto' };
@@ -130,7 +130,7 @@ function cardHtml(g, league, extra) {
     <div data-main>${mainHtml(g, extra.mk, extra.ctx)}</div>
     <div class="gm-foot">
       <details class="gm-public" data-public="${esc(g.id)}"${extra.open ? ' open' : ''}><summary>Apuestas del público</summary>
-        <p>No lo mostramos: no hay una fuente gratuita que diga cuánta gente ni cuánto dinero va a cada lado.</p></details>
+        <p>No hay una fuente gratuita para este dato.</p></details>
       <a class="gm-more" href="#/${esc(league)}/games/${encodeURIComponent(g.id)}${query}">Detalles del partido →</a>
     </div>
   </article>`;
@@ -323,7 +323,7 @@ function headerHtml(d) {
 function linesHtml(d, mk, ctx) {
   const lf = d.lastFive ?? {};
   const tr = (key, good, bad, what) => `<p class="gm-trends"><span>${esc(d.away.abbr)} ${trend(lastResults(lf.away, key), good, bad, `${d.away.abbr} ${what}`)}</span><span>${esc(d.home.abbr)} ${trend(lastResults(lf.home, key), good, bad, `${d.home.abbr} ${what}`)}</span><small>últimos ${Math.max(lf.away?.length ?? 0, lf.home?.length ?? 0) || 5}</small></p>`;
-  const ats = `<section class="gm-mk"><h3>Récord contra el hándicap</h3>${d.ats ? recTable(d, d.ats) : ui.empty('ESPN no publica el récord contra el hándicap de este partido.')}</section>`;
+  const ats = `<section class="gm-mk"><h3>Récord contra el hándicap</h3>${d.ats ? recTable(d, d.ats) : ui.empty('ESPN no publica el récord contra el hándicap.')}</section>`;
   if (mk.error) return ui.errorBox(mk.error) + ats;
   if (mk.accuracy?.publish === false) return `<p class="gm-note">${NO_PUBLISH}.</p>${ats}`;
   if (!mk.data?.markets?.length) return ui.empty('Oddsy no tiene cuotas para este partido.') + ats;
@@ -338,7 +338,7 @@ export function marketTables(d, mk, ctx, trends = {}) {
   const row = (m, s, top) => `<tr${s === top ? ' class="gm-top1"' : ''}><th scope="row">${esc(selName(d, s))}${s.line != null ? ` <span class="gm-line">${esc(lineTxt(m, s))}</span>` : ''}${s === top ? ' <small class="gm-tag">Más probable</small>' : ''}</th>
     <td><span class="gm-pc"><span class="gm-pbar" aria-hidden="true"><i style="width:${(s.p * 100).toFixed(1)}%"></i></span>${esc(ui.fmtPct(s.p))}</span></td><td>${esc(ui.fmtOdds(s.fair))}</td><td>${selBtn(d, m, s, ctx, true)}</td></tr>`;
   const seen = new Set(), main = mainTotal(mk.data.markets);
-  return `<p class="gm-src">${ui.sourceBadge('oddsy')} Abre un mercado para ver todas las opciones. Toca una cuota Oddsy para agregarla a Mis picks.</p>
+  return `<p class="gm-src">${ui.sourceBadge('oddsy')} Abre un mercado para ver sus opciones. Toca una cuota para agregarla a Mis picks.</p>
     <details class="gm-how"><summary>¿Cómo leer estas cuotas?</summary><dl>
       <dt>Probabilidad</dt><dd>Qué tan probable es, según Oddsy.</dd>
       <dt>Justa</dt><dd>La cuota sin margen: 1 dividido por la probabilidad.</dd>
@@ -396,8 +396,8 @@ function propsHtml(props, league, gameId, sport, kind) {
   if (!list.length) {
     return ui.empty({
       player: 'Oddsy no tiene props de jugador para este partido.',
-      team: 'Oddsy todavía no calcula apuestas por equipo, como los puntos de un solo equipo.',
-      game: 'Oddsy todavía no calcula otras apuestas del partido, como líneas alternativas o margen de victoria.',
+      team: 'Oddsy aún no calcula apuestas por equipo.',
+      game: 'Oddsy aún no calcula otras apuestas del partido.',
     }[kind]);
   }
   const top = (p) => (p.books ?? []).reduce((b, x) => (x.price > (b?.price ?? 0) ? x : b), null);
@@ -433,7 +433,7 @@ function matchupHtml(d) {
   const stats = keys.length
     ? `<div class="scroll"><table class="gm-rt"><thead><tr><th scope="col">Estadística</th><th scope="col">${A}</th><th scope="col">${H}</th></tr></thead><tbody>
       ${keys.map((k) => `<tr><th scope="row">${esc(get('away', k)?.label || get('home', k)?.label || k)}</th><td>${esc(get('away', k)?.display ?? '—')}${rank(get('away', k))}</td><td>${esc(get('home', k)?.display ?? '—')}${rank(get('home', k))}</td></tr>`).join('')}
-      </tbody></table></div><p class="gm-src">Promedios de la temporada según ESPN. El número pequeño es su puesto en la liga.</p>`
+      </tbody></table></div><p class="gm-src">Promedios de la temporada (ESPN). El número pequeño es su puesto en la liga.</p>`
     : ui.empty('ESPN no publica estadísticas de equipo para este partido.');
   const last = (side) => {
     const list = d.lastFive?.[side] ?? [];
@@ -445,7 +445,7 @@ function matchupHtml(d) {
       <b class="gm-r${esc(p.result)}">${esc(res[p.result] ?? p.result ?? '')} ${esc(p.score ?? '')}</b>
       <span>${p.ats ? `Hándicap: ${esc(res[p.ats] ?? p.ats)}` : ''}</span><span>${p.ou ? `Total: ${esc(ouTxt[p.ou] ?? p.ou)}` : ''}</span></li>`).join('')}</ul>`;
   };
-  return `<section class="gm-mk"><h3>Apuestas del público</h3><p class="gm-src">No lo mostramos: no hay una fuente gratuita que diga cuánta gente ni cuánto dinero va a cada lado.</p></section>
+  return `<section class="gm-mk"><h3>Apuestas del público</h3><p class="gm-src">No hay una fuente gratuita para este dato.</p></section>
     <section class="gm-mk"><h3>Estadísticas: ${A} vs ${H}</h3>${stats}</section>
     <section class="gm-mk"><h3>Récords</h3>${recTable(d, d.records ?? {})}</section>
     <section class="gm-mk"><h3>Últimos partidos · ${A}</h3>${last('away')}</section>
@@ -475,7 +475,7 @@ function insightsHtml(d) {
   try {
     list = bm.teamInsights?.(d) ?? [];
   } catch { /* datos incompletos: sin insights */ }
-  if (!list.length) return ui.empty('ESPN no tiene datos suficientes para sacar tendencias de este partido.');
+  if (!list.length) return ui.empty('Sin datos suficientes para sacar tendencias.');
   return `<ul class="gm-ins">${list.map((i) => `<li><p>${esc(i.text)}</p>${i.pct != null ? `<small>${esc(ui.fmtPct(i.pct, 0))}${i.n ? ` · ${esc(i.k)} de ${esc(i.n)}` : ''}</small>` : ''}</li>`).join('')}</ul>`;
 }
 

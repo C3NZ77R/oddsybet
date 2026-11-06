@@ -290,7 +290,7 @@ async function renderList(el, ctx) {
   }
   const rowHtml = (r) => `<tr data-k="${esc(r.key)}" data-a="${esc(r.p.athleteId ?? '')}" data-g="${esc(r.p.gameId ?? '')}">${rowInner(r)}</tr>`;
   function head() {
-    const cols = [['player', 'Jugador'], ['line', 'Línea', hasBt ? 'La de Betano cuando la trajiste; si no, la línea Oddsy' : 'Línea Oddsy: el valor del medio en sus últimos 20 partidos'], ['p', 'Prob.', 'Probabilidad según Oddsy'], ['fair', 'Justa', 'Cuota sin margen: 1 dividido por la probabilidad'], ['odds', 'Oddsy', 'Cuota Oddsy, con un margen del 5 %'], ...(hasBt ? [['ev', 'Betano', 'Cuota de Betano y la ventaja con la probabilidad de Oddsy']] : []), ['opp', 'Defensa rival', 'Puesto de la defensa rival en esa estadística (1 = la que menos permite)'], ...WINS.map((w) => [w, ...WIN_HEAD[w]])];
+    const cols = [['player', 'Jugador'], ['line', 'Línea', hasBt ? 'La de Betano cuando la trajiste; si no, la línea Oddsy' : 'Línea Oddsy: la mediana de sus últimos 20 partidos'], ['p', 'Prob.', 'Probabilidad según Oddsy'], ['fair', 'Justa', 'Cuota sin margen: 1 dividido por la probabilidad'], ['odds', 'Oddsy', 'Cuota Oddsy, con margen'], ...(hasBt ? [['ev', 'Betano', 'Cuota de Betano y la ventaja con la probabilidad de Oddsy']] : []), ['opp', 'Defensa rival', 'Puesto de la defensa rival (1 = la que menos permite)'], ...WINS.map((w) => [w, ...WIN_HEAD[w]])];
     return `<tr><th scope="col"><span class="sr-only">Boleto</span></th>${cols.map(([k, label, title]) => {
       const on = f.sort === k;
       return `<th scope="col" aria-sort="${on ? (f.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" class="pp-sort" data-act="sort" data-sort="${k}"${title ? ` title="${esc(title)}"` : ''}>${esc(label)}${on ? (f.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button></th>`;
@@ -374,9 +374,9 @@ async function renderList(el, ctx) {
       ${dd('players', 'Jugadores', searchBox(`<div class="pp-list" data-plist>${players}</div>`), 'pp-wide')}
       ${dd('games', 'Partidos', `<div class="pp-list">${games || '<p class="pp-muted">Sin partidos.</p>'}</div>`)}
       ${dd('side', 'Más/Menos', `${radio('all', 'Ambos')}${radio('Over', 'Más de (Over)')}${radio('Under', 'Menos de (Under)')}`)}
-      ${dd('odds', 'Cuotas', `<p class="pp-muted">Escribe el rango en formato americano, por ejemplo de −300 a +200.</p><div class="pp-row"><label class="pp-field">Mínima <input type="number" step="5" data-f="minOdds" value="${esc(f.minOdds)}" placeholder="-300"></label><label class="pp-field">Máxima <input type="number" step="5" data-f="maxOdds" value="${esc(f.maxOdds)}" placeholder="200"></label></div>`)}
+      ${dd('odds', 'Cuotas', `<p class="pp-muted">Rango en formato americano, por ejemplo −300 a +200.</p><div class="pp-row"><label class="pp-field">Mínima <input type="number" step="5" data-f="minOdds" value="${esc(f.minOdds)}" placeholder="-300"></label><label class="pp-field">Máxima <input type="number" step="5" data-f="maxOdds" value="${esc(f.maxOdds)}" placeholder="200"></label></div>`)}
       ${dd('hit', 'Acierto', `<div class="pp-row"><label class="pp-field">Mínimo % <input type="number" min="0" max="100" step="5" data-f="minHit" value="${esc(f.minHit)}" placeholder="60"></label><label class="pp-field">Periodo <select data-f="hitWin">${winOpts}</select></label></div>`)}
-      ${dd('matchup', 'Defensa rival', `${Object.entries(MATCHUP).map(([k, label]) => check('matchup', k, `<i class="pp-dot pp-${k}"></i>${label}`, f.matchup.includes(k))).join('')}<p class="pp-muted">Según el puesto de la defensa rival en esa estadística. Solo aparece cuando ESPN publica ese ranking.</p>`)}
+      ${dd('matchup', 'Defensa rival', `${Object.entries(MATCHUP).map(([k, label]) => check('matchup', k, `<i class="pp-dot pp-${k}"></i>${label}`, f.matchup.includes(k))).join('')}<p class="pp-muted">Según el puesto de la defensa rival. Solo si ESPN publica ese ranking.</p>`)}
       ${league === 'nba' ? dd('betano', 'Betano', betanoHtml(store), 'pp-wide') : ''}
       <button type="button" class="pp-link" data-act="reset">Limpiar</button>
       <span class="pp-count" data-count role="status"></span>
@@ -549,7 +549,7 @@ async function renderDetail(el, ctx) {
     const sideBtn = (side, p) => `<button type="button" data-sv="side:${side}" aria-pressed="${s.side === side}">${SIDE[side]} ${esc(fmtLine(s.line))} <b>${p ? esc(ui.fmtOdds(oddsy(p).price)) : '—'}</b></button>`;
     // Sin línea pero con historial de esa estadística: menos de MIN_GAMES partidos.
     const thin = ours == null && log && valsOf(games, sport, s.stat).length < MIN_GAMES;
-    const why = thin ? THIN : gameId == null ? 'No tiene partido próximo, así que Oddsy no da línea.' : 'Oddsy no tiene línea para esta estadística.';
+    const why = thin ? THIN : gameId == null ? 'Sin partido próximo, Oddsy no da línea.' : 'Oddsy no tiene línea para esta estadística.';
     return `<p class="pp-market">${esc(propText(s.side, s.line, d, s.stat))}</p>
       <div class="pp-seg pp-sides" role="group" aria-label="Lado">${sideBtn('Over', over)}${sideBtn('Under', under)}</div>
       ${ours == null ? `<p class="pp-muted">${esc(why)}</p>`
@@ -567,7 +567,7 @@ async function renderDetail(el, ctx) {
     return bm.splitGames(games, opts).map((g) => ({ g, v: S.statOf(sport, s.stat, g.stats) })).filter((x) => Number.isFinite(x.v));
   }
   function ana() {
-    if (!log) return str(ui.empty(athleteId == null ? 'No encontramos a este jugador en ESPN, así que no hay historial.' : 'No se pudo cargar el historial de este jugador.'));
+    if (!log) return str(ui.empty(athleteId == null ? 'No encontramos a este jugador en ESPN.' : 'No se pudo cargar su historial.'));
     const d = def(), win = picked(s.win), vals = win.map((x) => x.v);
     const h = rate(vals, s.line, s.side), sm = bm.summarize(vals);
     const others = WINS.filter((w) => w !== s.win).map((w) => [w, rate(picked(w).map((x) => x.v), s.line, s.side)]);
@@ -593,7 +593,7 @@ async function renderDetail(el, ctx) {
   }
 
   function matchupPanel() {
-    if (!gd?.home) return '<p class="pp-muted">No encontramos el partido de este jugador, así que no hay datos del rival.</p>';
+    if (!gd?.home) return '<p class="pp-muted">No encontramos su partido: no hay datos del rival.</p>';
     const d = def(), a = gd.away, hm = gd.home;
     const al = sd ? matchupFrom(allowedStat(gd.teamStats?.[sd.opp], s.stat), league, s.side) : null;
     const defense = sd ? `<h3>Defensa de ${esc(sd.oppTeam.abbr)} en ${esc(statName(d, s.stat).toLowerCase())}</h3>${al
@@ -613,10 +613,10 @@ async function renderDetail(el, ctx) {
       ${table('Rankings de la temporada', gd.teamStats?.away, gd.teamStats?.home, statCell) || '<p class="pp-muted">ESPN no publica estadísticas de equipo para este partido.</p>'}
       ${table('Récords', gd.records?.away, gd.records?.home, recCell)}
       ${gd.ats ? table('Contra el hándicap', gd.ats.away, gd.ats.home, recCell) : ''}
-      <h3>Apuestas del público</h3><p class="pp-muted">No lo mostramos: no hay una fuente gratuita que diga cuánta gente ni cuánto dinero va a cada lado.</p>`;
+      <h3>Apuestas del público</h3><p class="pp-muted">No hay una fuente gratuita para este dato.</p>`;
   }
   function lineupPanel() {
-    if (!gd?.home) return '<p class="pp-muted">Sin partido: no hay alineaciones ni lesiones que mostrar.</p>';
+    if (!gd?.home) return '<p class="pp-muted">Sin partido: no hay alineaciones ni lesiones.</p>';
     const person = (x) => `<li><span class="pp-pos">${esc(x.pos ?? '')}</span> ${esc(x.name)}</li>`;
     return ['away', 'home'].map((side) => {
       const t = gd[side], starters = gd.starters?.[side] ?? [], roster = gd.rosters?.[side] ?? [];
