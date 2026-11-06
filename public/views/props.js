@@ -186,11 +186,11 @@ const ago = (at) => { const m = Math.round((Date.now() - at) / 60000); return m 
 function betanoHtml(store) {
   const b = B.saved(store), n = b ? Object.keys(b.lines).length : 0;
   return `${n ? `<p>Tienes ${n} líneas de Betano, traídas ${ago(b.at)}. <button type="button" class="pp-link" data-act="btclear">Borrarlas</button></p>` : '<p class="pp-muted">Todavía no has traído líneas de Betano.</p>'}
-    <p>Con el marcador "Oddsy ← Betano", cada prop usa la línea exacta de Betano y muestra su cuota. Se instala una vez; después, en betano.co, abres la página de la NBA (trae todos los partidos) o un partido y lo tocas.</p>
+    <p class="pp-muted">Instala el marcador una vez; luego, en betano.co, ábrelo en la página de la NBA o de un partido.</p>
     <p>En el computador, arrastra este botón a la barra de marcadores: <a class="pp-btn" href="${esc(B.bookmarklet(location.origin))}" data-act="btlink">Oddsy ← Betano</a></p>
     <p>En el celular: <button type="button" class="pp-btn" data-act="btcopy">Copiar el código</button></p>
-    <ol class="pp-steps"><li>En Chrome, guarda cualquier página como favorito (la estrella del menú ⋮) y edítalo.</li><li>Ponle de nombre oddsy, borra la URL y pega el código.</li><li>En Betano, toca la barra de direcciones, escribe oddsy y toca el favorito.</li></ol>
-    <p class="pp-muted">En iPhone es igual en Safari y se abre desde Favoritos. Dentro de la app de Betano no funciona: abre betano.co en el navegador.</p>`;
+    <details><summary>Pasos en el celular</summary><ol class="pp-steps"><li>En Chrome, guarda cualquier página como favorito (la estrella del menú ⋮) y edítalo.</li><li>Ponle de nombre oddsy, borra la URL y pega el código.</li><li>En Betano, toca la barra de direcciones, escribe oddsy y toca el favorito.</li></ol>
+    <p class="pp-muted">En iPhone es igual en Safari. No funciona dentro de la app de Betano: usa betano.co en el navegador.</p></details>`;
 }
 
 // ======================= LISTA =======================
