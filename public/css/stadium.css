@@ -122,7 +122,7 @@
 .st-chart .now { stroke: var(--text); stroke-dasharray: 3 3; }
 .st-chart .wp { fill: none; stroke: var(--teal); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 /* Marcas en su minuto real: con descuento el gráfico pasa de 90' y 45' ya no está en el centro. */
-.st-axis { position: relative; height: 16px; margin: 2px 0 0; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.st-axis { position: relative; height: 16px; margin: 2px 0 0; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .st-axis span { position: absolute; transform: translateX(-50%); }
 .st-axis span:first-child { transform: none; }
 .st-axis span:last-child { transform: translateX(-100%); }

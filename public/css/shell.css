@@ -19,11 +19,11 @@
 
 /* Navegación: móvil = barra inferior */
 .side { position: fixed; z-index: 45; left: 0; right: 0; bottom: 0; display: flex; padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); background: rgba(8,10,12,.94); backdrop-filter: blur(14px); border-top: 1px solid var(--line); }
-.side a { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 2px; color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 600; border-radius: 12px; background: none; border: 0; }
+.side a { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 2px; color: var(--muted); text-decoration: none; font-size: 12px; font-weight: 600; border-radius: 12px; background: none; border: 0; }
 .side a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 /* 7 pestañas en 360 px: cada una mide al menos su palabra más larga y el nombre baja a una segunda línea en vez de cortarse. */
 @media (max-width: 767px) {
-  .side a { flex: 1 1 0; min-width: min-content; padding: 6px 1px; font-size: 10px; line-height: 1.15; text-align: center; }
+  .side a { flex: 1 1 0; min-width: min-content; padding: 6px 1px; font-size: 11px; line-height: 1.15; text-align: center; }
   .side a span { white-space: normal; overflow: visible; }
 }
 .side svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
@@ -37,7 +37,7 @@
 .hero { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; padding: 14px 18px; margin-bottom: 12px; border: 1px solid #1d4d45; border-radius: 16px; background: linear-gradient(120deg, rgba(47,226,196,.08), rgba(246,164,124,.06)); }
 .hero h1 { font-size: 22px; margin: 6px 0 2px; }
 .hero p { margin: 0; color: var(--muted); font-size: 14px; max-width: 620px; }
-.pill { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px; border: 1px solid #1d4d45; border-radius: 999px; background: rgba(47,226,196,.06); color: var(--teal); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px; border: 1px solid #1d4d45; border-radius: 999px; background: rgba(47,226,196,.06); color: var(--teal); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--teal); }
 
 /* Boleto: cajón en móvil/tablet, columna fija en escritorio ancho */
@@ -53,16 +53,16 @@
 .slip-group ul { list-style: none; margin: 0; padding: 0; }
 .slip-pick { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
 .slip-label { display: block; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
-.slip-txt small { color: var(--muted); font-size: 11px; }
+.slip-txt small { color: var(--muted); font-size: 12px; }
 .slip-price { font-size: 14px; }
 .slip-foot:empty { display: none; }
 .slip-foot { border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
 .slip-total { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0 0 8px; }
-.slip-total dt { color: var(--muted); font-size: 11px; }
+.slip-total dt { color: var(--muted); font-size: 12px; }
 .slip-total dd { margin: 0; font-weight: 800; }
-.slip-note { margin: 0 0 10px; color: var(--muted); font-size: 11px; }
+.slip-note { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
 .slip-ghead h3 { margin: 0; font-size: 13px; }
-.slip-gnote { margin: 0; padding: 8px 10px; color: var(--muted); font-size: 11px; }
+.slip-gnote { margin: 0; padding: 8px 10px; color: var(--muted); font-size: 12px; }
 .slip-warn { margin: 0; padding: 8px 10px; border: 1px solid var(--warn); border-radius: 12px; color: var(--warn); font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
 .slip-actions { display: flex; gap: 8px; }
 .slip-actions .btn-primary { flex: 1; }
