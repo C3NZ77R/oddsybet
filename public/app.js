@@ -5,6 +5,7 @@ import { ui, h, empty, fmtOdds, fmtPct, bookInfo, bookChip, raw } from './ui.js'
 import { LEAGUES, leagueById } from './leagues.js';
 import { decode as decodeBetano, save as saveBetano } from './betano.js';
 import { RG_LINE, importPicks, slipModel, combinedOdds, slipText, toastMs, hasUserInput } from './shell.js';
+import { initChat } from './chat.js';
 
 const $ = (s) => document.querySelector(s);
 const LEAGUE_VIEWS = ['props', 'games', 'live', 'picks', 'insights', 'popular', 'seguir'];
@@ -291,4 +292,5 @@ navigator.serviceWorker?.addEventListener('message', (e) => {
 syncOddsToggle();
 syncSlip();
 renderSlip();
+initChat();
 route();

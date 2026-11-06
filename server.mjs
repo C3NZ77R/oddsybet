@@ -12,6 +12,7 @@ import { getRankings, getPlayer } from './lib/tennis.mjs';
 import { trackFromEnv } from './lib/track-routes.mjs';
 import { currentModel } from './lib/learn.mjs';
 import { picklogFromEnv, sameSecret } from './lib/picklog.mjs';
+import { chat, parseBody, rateOk } from './lib/chat.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -161,6 +162,15 @@ export async function handler(req, res) {
   try {
     if (url.pathname.startsWith('/api/track/')) return await trackRoute(req, res, url);
     if (url.pathname.startsWith('/api/picklog/')) return await picklogRoute(req, res, url);
+    if (url.pathname === '/api/chat') {
+      if (req.method !== 'POST') throw espn.httpError(405, 'Método no permitido');
+      const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress).split(',')[0].trim();
+      if (!rateOk(ip)) throw espn.httpError(429, 'Demasiados mensajes seguidos. Espera un minuto.');
+      let raw = '';
+      for await (const c of req) if ((raw += c).length > 20_000) throw espn.httpError(413, 'Mensaje muy largo');
+      json(res, 200, await chat(parseBody(raw), { key: process.env.GEMINI_API_KEY }));
+      return;
+    }
     if (url.pathname.startsWith('/api/')) {
       if (req.method !== 'GET' && req.method !== 'HEAD') throw espn.httpError(405, 'Método no permitido');
       const route = ROUTES[url.pathname];
