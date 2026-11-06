@@ -172,7 +172,7 @@ function renderSlip() {
   $('#fabCount').textContent = picks.length;
   const body = $('#slipBody'), foot = $('#slipFoot');
   if (!picks.length) {
-    body.innerHTML = empty('Aún no tienes picks. Toca una cuota o el botón + en Props, Partidos o Tendencias.');
+    body.innerHTML = empty('Sin picks todavía.');
     foot.innerHTML = '';
     return;
   }
@@ -276,12 +276,6 @@ store.on('settings', (s) => {
   if (KEEP_INPUT.includes(curView) && hasUserInput($('#view'))) return toast('Formato cambiado en el boleto. Esta vista lo usará cuando la vuelvas a abrir, así no pierdes lo que escribiste.');
   route();
 });
-
-if (!store.get('heroSeen')) {
-  $('#hero').hidden = false;
-  store.set('heroSeen', true);
-}
-$('[data-hero-close]').addEventListener('click', () => { $('#hero').hidden = true; $('#view').focus(); });
 
 window.addEventListener('hashchange', route);
 // Tocar un aviso con Oddsy abierto: el service worker pide llevar la página a Mis apuestas.

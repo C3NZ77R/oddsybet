@@ -94,7 +94,7 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
         <div class="st-board">${side('away')}<span class="st-score"><b data-s="away">0</b><i>–</i><b data-s="home">0</b></span>${side('home')}</div>
         <p class="st-status" data-status></p>
       </header>
-      <p class="hint st-delay">ESPN publica cada jugada con unos minutos de atraso: esto es una repetición de lo que ya pasó, no la transmisión.</p>
+      <p class="hint st-delay">ESPN publica cada jugada con unos minutos de atraso.</p>
       <div data-err></div>
       <section class="card st-arena" style="--home:${col.home};--away:${col.away}">
         <div class="st-stage" data-sport="${sport}">
@@ -115,7 +115,6 @@ export default async function stadium(el, { api, leagueInfo: lg, params }) {
             .map(([k, t]) => h`<button type="button" class="chip-btn" data-layer="${k}" aria-pressed="${k === layer}">${t}</button>`)}
           ${sport === 'basketball' ? h`<label class="st-shooter" hidden>Jugador <select data-shooter><option value="">Todos</option></select></label>` : ''}
         </div>
-        <p class="hint st-tip">Toca un punto de la cancha para ver esa jugada.</p>
         <div class="st-scrub"><label>Rebobinar <input type="range" min="0" max="0" value="0" data-scrub></label>
           <button type="button" class="btn btn-primary" data-replay>▶ Repetir el partido</button>
           <button type="button" class="btn" data-live hidden>Volver al final</button></div>

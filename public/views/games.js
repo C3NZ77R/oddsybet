@@ -27,33 +27,6 @@ export const accText = (acc) => (acc?.brier != null
   ? `Precisión de Oddsy: Brier ${acc.brier.toFixed(3)} en ${acc.n} partidos jugados (menos es mejor). Con solo los resultados de la temporada pasada: ${acc.baseline?.brier?.toFixed(3) ?? '—'}.`
   : 'Precisión de Oddsy: aún sin medir en esta liga.');
 
-// Qué se apuesta en cada mercado (claves de lib/markets.mjs), en palabras simples. n = primera selección, t = su línea.
-const ORD = { 3: 'tercer', 4: 'cuarto', 5: 'quinto' };
-const count = (what, t) => `Se cuentan ${what}.${t % 1 ? ` Más ${t} gana si hay ${Math.ceil(t)} o más; Menos ${t}, ${t < 1 ? 'si no hay ninguno' : `si hay ${Math.floor(t)} o menos`}.` : ''}`;
-const shift = (n, t, unit) => `A ${n} se le ${t < 0 ? 'restan' : 'suman'} ${Math.abs(t)} ${unit} al final. Ganas si tu elección queda arriba después de ese ajuste.`;
-const QUARTER = ' Si la línea es entera y quedan iguales, te devuelven la apuesta. Si termina en .25 o .75, la apuesta se reparte entre las dos líneas vecinas.';
-const HOW = {
-  ml: () => 'Eliges quién gana el partido. El marcador no importa.',
-  '1x2': () => 'Eliges si gana el local, si empatan o si gana el visitante.',
-  dc: () => 'Cubres dos de los tres resultados con una sola apuesta.',
-  dnb: () => 'Eliges quién gana. Si empatan, te devuelven la apuesta.',
-  ou: (n, t, m) => count(`los ${/Total de (\S+)/.exec(m.label)?.[1] ?? 'puntos'} de los dos equipos`, t),
-  ou_home: (n, t) => count('solo los goles del local', t),
-  ou_away: (n, t) => count('solo los goles del visitante', t),
-  aou: () => `Se cuentan los goles de los dos equipos.${QUARTER}`,
-  btts: () => 'Sí gana si los dos equipos marcan al menos un gol.',
-  cs: () => 'Aciertas solo si el marcador final es exactamente ese.',
-  ah: (n, t) => shift(n, t, 'goles') + QUARTER,
-  spread: (n, t) => shift(n, t, 'puntos'),
-  sets: () => 'Aciertas solo si el marcador en sets es exactamente ese.',
-  ou_sets: (n, t) => `Más ${t} gana si se juega un ${ORD[Math.ceil(t)] ?? `${Math.ceil(t)}.º`} set; Menos ${t}, si el partido se acaba antes.`,
-  ou_games: (n, t) => count('todos los games del partido', t),
-  games_hcp: (n, t) => shift(n, t, 'games'),
-  win_set: () => 'Sí gana si se lleva por lo menos un set, aunque pierda el partido.',
-  first_set: () => 'Solo cuenta el primer set. Lo que pase después no importa.',
-  ou_set1: (n, t) => `${count('solo los games del primer set', t)} Si el set se define en tiebreak (7-6), son 13.`,
-};
-
 // ---------- piezas de UI ----------
 const timeOf = (iso) => new Date(iso).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
 const isLive = (g) => g.status?.state === 'in' || (g.status?.state === 'pre' && Date.parse(g.start) <= Date.now());
@@ -129,8 +102,6 @@ function cardHtml(g, league, extra) {
     <div class="gm-teams">${sides.map((side) => teamRow(g, side, tennis)).join('')}</div>
     <div data-main>${mainHtml(g, extra.mk, extra.ctx)}</div>
     <div class="gm-foot">
-      <details class="gm-public" data-public="${esc(g.id)}"${extra.open ? ' open' : ''}><summary>Apuestas del público</summary>
-        <p>No hay una fuente gratuita para este dato.</p></details>
       <a class="gm-more" href="#/${esc(league)}/games/${encodeURIComponent(g.id)}${query}">Detalles del partido →</a>
     </div>
   </article>`;
@@ -245,7 +216,7 @@ async function renderList(root, ctx, lg, state) {
     root.querySelector('[data-livebar]').hidden = !games.some(isLive);
     io?.disconnect();
     pc.picks = [];
-    list.innerHTML = games.map((g) => cardHtml(g, lg.id, { mk: null, ctx: pc, open: state.open.has(g.id), date })).join('');
+    list.innerHTML = games.map((g) => cardHtml(g, lg.id, { mk: null, ctx: pc, date })).join('');
     if (!tennis) for (const card of list.querySelectorAll('.gm-card')) io ? io.observe(card) : loadTrend(card);
     const note = root.querySelector('[data-note]');
     marketsOf(date).then((mk) => {
@@ -282,10 +253,6 @@ async function renderList(root, ctx, lg, state) {
     drawDates();
     drawList();
   });
-  root.addEventListener('toggle', (e) => {
-    const d = e.target.closest?.('[data-public]');
-    if (d) d.open ? state.open.add(d.dataset.public) : state.open.delete(d.dataset.public);
-  }, true);
 
   // Marcadores en vivo: cada 60 s si el día elegido tiene partidos en juego.
   state.timer = setInterval(async () => {
@@ -338,20 +305,14 @@ export function marketTables(d, mk, ctx, trends = {}) {
   const row = (m, s, top) => `<tr${s === top ? ' class="gm-top1"' : ''}><th scope="row">${esc(selName(d, s))}${s.line != null ? ` <span class="gm-line">${esc(lineTxt(m, s))}</span>` : ''}${s === top ? ' <small class="gm-tag">Más probable</small>' : ''}</th>
     <td><span class="gm-pc"><span class="gm-pbar" aria-hidden="true"><i style="width:${(s.p * 100).toFixed(1)}%"></i></span>${esc(ui.fmtPct(s.p))}</span></td><td>${esc(ui.fmtOdds(s.fair))}</td><td>${selBtn(d, m, s, ctx, true)}</td></tr>`;
   const seen = new Set(), main = mainTotal(mk.data.markets);
-  return `<p class="gm-src">${ui.sourceBadge('oddsy')} Abre un mercado para ver sus opciones. Toca una cuota para agregarla a Mis picks.</p>
-    <details class="gm-how"><summary>¿Cómo leer estas cuotas?</summary><dl>
-      <dt>Probabilidad</dt><dd>Qué tan probable es, según Oddsy.</dd>
-      <dt>Justa</dt><dd>La cuota sin margen: 1 dividido por la probabilidad.</dd>
-      <dt>Oddsy</dt><dd>La cuota justa con el margen de una casa: 5% en los mercados principales, más en los secundarios y en el marcador exacto, y más en el lado menos probable.</dd></dl></details>`
+  return `<p class="gm-src">${ui.sourceBadge('oddsy')}</p>`
     + mk.data.markets.map((m, i) => {
       // La tendencia del total va en la línea principal (fútbol tiene 0.5 a 5.5), no en la primera.
       const t = !seen.has(m.key) && (m.key !== 'ou' || m.selections[0].line === main) && trends[m.key];
       if (t) seen.add(m.key);
       const top = m.selections.reduce((a, b) => (b.p > a.p ? b : a));
-      const first = m.selections[0];
-      const how = HOW[m.key]?.(selName(d, first), first.line, m);
       return `<details class="gm-mk gm-acc"${i ? '' : ' open'}><summary><h3>${esc(m.label)}</h3><span class="gm-fav" title="Opción más probable">${esc(selLabel(d, m, top))} · ${esc(ui.fmtPct(top.p))}</span></summary>
-        ${how ? `<p class="gm-hint">${esc(how)}</p>` : ''}<div class="scroll"><table class="gm-mt">${head}<tbody>${m.selections.map((s) => row(m, s, top)).join('')}</tbody></table></div>${t || ''}</details>`;
+        <div class="scroll"><table class="gm-mt">${head}<tbody>${m.selections.map((s) => row(m, s, top)).join('')}</tbody></table></div>${t || ''}</details>`;
     }).join('')
     + `<p class="gm-src">${esc(accText(mk.accuracy))}</p>`;
 }
@@ -433,7 +394,7 @@ function matchupHtml(d) {
   const stats = keys.length
     ? `<div class="scroll"><table class="gm-rt"><thead><tr><th scope="col">Estadística</th><th scope="col">${A}</th><th scope="col">${H}</th></tr></thead><tbody>
       ${keys.map((k) => `<tr><th scope="row">${esc(get('away', k)?.label || get('home', k)?.label || k)}</th><td>${esc(get('away', k)?.display ?? '—')}${rank(get('away', k))}</td><td>${esc(get('home', k)?.display ?? '—')}${rank(get('home', k))}</td></tr>`).join('')}
-      </tbody></table></div><p class="gm-src">Promedios de la temporada (ESPN). El número pequeño es su puesto en la liga.</p>`
+      </tbody></table></div>`
     : ui.empty('ESPN no publica estadísticas de equipo para este partido.');
   const last = (side) => {
     const list = d.lastFive?.[side] ?? [];
@@ -445,8 +406,7 @@ function matchupHtml(d) {
       <b class="gm-r${esc(p.result)}">${esc(res[p.result] ?? p.result ?? '')} ${esc(p.score ?? '')}</b>
       <span>${p.ats ? `Hándicap: ${esc(res[p.ats] ?? p.ats)}` : ''}</span><span>${p.ou ? `Total: ${esc(ouTxt[p.ou] ?? p.ou)}` : ''}</span></li>`).join('')}</ul>`;
   };
-  return `<section class="gm-mk"><h3>Apuestas del público</h3><p class="gm-src">No hay una fuente gratuita para este dato.</p></section>
-    <section class="gm-mk"><h3>Estadísticas: ${A} vs ${H}</h3>${stats}</section>
+  return `<section class="gm-mk"><h3>Estadísticas: ${A} vs ${H}</h3>${stats}</section>
     <section class="gm-mk"><h3>Récords</h3>${recTable(d, d.records ?? {})}</section>
     <section class="gm-mk"><h3>Últimos partidos · ${A}</h3>${last('away')}</section>
     <section class="gm-mk"><h3>Últimos partidos · ${H}</h3>${last('home')}</section>`;
@@ -550,7 +510,7 @@ export default {
   async render(el, ctx) {
     ui = ctx.ui;
     const lg = typeof ctx.league === 'string' ? leagueById(ctx.league) : ctx.league;
-    const state = { dead: false, timer: null, date: null, details: new Map(), markets: new Map(), open: new Set(), cleanups: [] };
+    const state = { dead: false, timer: null, date: null, details: new Map(), markets: new Map(), cleanups: [] };
     const cleanup = () => {
       state.dead = true;
       clearInterval(state.timer);

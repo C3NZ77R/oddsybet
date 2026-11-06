@@ -53,14 +53,14 @@ const when = (iso) => new Date(iso).toLocaleString('es-CO', { weekday: 'short', 
 
 function pushHtml(state, err) {
   const msg = err ? h`<p class="sg-msg" role="alert">${err}</p>` : '';
-  if (state === 'active') return h`<h2>Avisos activados</h2><p class="hint">Te avisamos en este celular cuando tu apuesta se acerque, se cumpla o se caiga, aunque Oddsy esté cerrado.</p>${msg}`;
+  if (state === 'active') return h`<h2>Avisos activados</h2>${msg}`;
   if (state === 'ios-install') {
     return h`<h2>Primero, agrega Oddsy a tu inicio</h2><p class="hint">En iPhone los avisos solo funcionan con Oddsy instalado (iOS 16.4 o más nuevo):</p>
       <ol class="sg-steps"><li>Toca <b>Compartir</b> en Safari (el cuadro con la flecha).</li><li>Elige <b>Agregar a inicio</b>.</li><li>Abre Oddsy desde el ícono nuevo y vuelve a esta sección.</li></ol>${msg}`;
   }
-  if (state === 'denied') return h`<h2>Los avisos están bloqueados</h2><p class="hint">Negaste el permiso de notificaciones. Actívalo en los ajustes del celular (Notificaciones → Oddsy, o en Chrome: Configuración del sitio → Notificaciones) y vuelve aquí.</p>${msg}`;
-  if (state === 'unsupported') return h`<h2>Los avisos son para el celular</h2><p class="hint">Abre Oddsy en Chrome en Android, o en iPhone agrégalo a la pantalla de inicio desde Safari. Desde ahí activas los avisos y registras tus apuestas.</p>${msg}`;
-  return h`<h2>Activa los avisos</h2><p class="hint">Registra tu apuesta y te avisamos al celular cuando se acerque, se cumpla o se caiga. Sin cuenta ni datos personales.</p>
+  if (state === 'denied') return h`<h2>Los avisos están bloqueados</h2><p class="hint">Actívalos en los ajustes del celular (Notificaciones → Oddsy).</p>${msg}`;
+  if (state === 'unsupported') return h`<h2>Los avisos son para el celular</h2><p class="hint">Ábrelo en Chrome en Android, o en iPhone agrégalo a la pantalla de inicio.</p>${msg}`;
+  return h`<h2>Activa los avisos</h2>
     <button type="button" class="btn btn-primary" data-enable>Activar avisos</button>${msg}`;
 }
 
@@ -79,8 +79,7 @@ export default {
     let rows = null, meta = { book: '', odds: '' }, games = [], busy = false, pushErr = '', addMsg = '';
     const rosters = new Map(); // teamId → atletas
 
-    el.innerHTML = h`<header class="view-head"><div><h1>Mis apuestas · NBA</h1>
-      <p class="hint">Sigue en vivo tus apuestas de NBA de cualquier casa, sencillas o combinadas. Oddsy no recibe apuestas ni dinero.</p></div></header>
+    el.innerHTML = h`<header class="view-head"><div><h1>Mis apuestas · NBA</h1></div></header>
       <section class="card sg-push" data-push></section>
       <section class="card sg-add" data-add hidden></section>
       <section class="sg-list" data-list aria-labelledby="sgListTitle"></section>`;
@@ -129,7 +128,6 @@ export default {
       const msg = addMsg ? h`<p class="sg-msg" role="alert">${addMsg}</p>` : '';
       if (!rows) {
         box.innerHTML = h`<h2>Registrar una apuesta</h2>
-          <p class="hint">Sube el pantallazo del ticket o pega su texto. Antes de seguirla revisas lo que entendimos.</p>
           <div class="sg-actions">
             <label class="btn btn-primary sg-file"><input type="file" accept="image/*" data-file class="sr-only"${busy ? raw(' disabled') : ''}>Subir pantallazo</label>
             <button type="button" class="btn" data-paste${busy ? raw(' disabled') : ''}>Pegar texto</button>
@@ -143,7 +141,6 @@ export default {
         return;
       }
       box.innerHTML = h`<h2>Revisa tu apuesta</h2>
-        <p class="hint">Corrige lo que haga falta. Seguimos tu apuesta con la línea y la cuota de tu casa.</p>
         <ol class="sg-rows">${rows.map(rowHtml)}</ol>
         <p><button type="button" class="btn" data-addrow>Agregar selección</button></p>
         <div class="sg-fields sg-meta"><label>Casa <input data-meta="book" maxlength="40" autocomplete="off" placeholder="Betplay" value="${meta.book}"></label>

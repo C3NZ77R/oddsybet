@@ -1,4 +1,4 @@
-/* Shell: cabecera, navegación (lateral en escritorio / inferior en móvil), chips de liga, hero y boleto. */
+/* Shell: cabecera, navegación (lateral en escritorio / inferior en móvil), chips de liga y boleto. */
 .skip { position: absolute; left: -9999px; top: 8px; z-index: 100; padding: 8px 14px; border-radius: 10px; background: var(--teal); color: var(--on-accent); font-weight: 700; }
 .skip:focus { left: 16px; }
 
@@ -32,11 +32,8 @@
 .side a[aria-current="page"] svg { stroke: var(--teal); }
 .side a[aria-current="page"] { background: var(--panel-2); box-shadow: inset 0 0 0 1px rgba(47,226,196,.5); }
 
-/* Chips de liga y hero */
+/* Chips de liga */
 .league-chips { margin: 0 -16px; padding: 4px 16px 12px; }
-.hero { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; padding: 14px 18px; margin-bottom: 12px; border: 1px solid #1d4d45; border-radius: 16px; background: linear-gradient(120deg, rgba(47,226,196,.08), rgba(246,164,124,.06)); }
-.hero h1 { font-size: 22px; margin: 6px 0 2px; }
-.hero p { margin: 0; color: var(--muted); font-size: 14px; max-width: 620px; }
 .pill { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px; border: 1px solid #1d4d45; border-radius: 999px; background: rgba(47,226,196,.06); color: var(--teal); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--teal); }
 

@@ -152,10 +152,7 @@ test('Partidos: la tabla de mercados muestra probabilidad, Justa y Oddsy de cada
   const [home] = markets.find((m) => m.key === 'ml').selections;
   assert.ok(html.includes(`DET`) && html.includes(fmtOdds(home.fair)) && html.includes(fmtOdds(home.oddsy)));
   assert.match(html, /Brier 0\.216 en 616 partidos/);
-  // Cada mercado explica qué se apuesta y marca la opción más probable.
-  const t = markets.find((m) => m.key === 'ou').selections[0].line;
-  assert.ok(html.includes(`Se cuentan los puntos de los dos equipos. Más ${t} gana si hay ${Math.ceil(t)} o más`));
-  assert.match(html, /A DET se le (restan|suman) \d/);
+  // Cada mercado marca la opción más probable.
   assert.equal(html.match(/Más probable/g).length, markets.length);
   assert.equal(ctx.picks.length, markets.flatMap((m) => m.selections).length);
   assert.ok(ctx.picks.every((p) => p.book === 'oddsy'));

@@ -23,7 +23,7 @@ function gameCard(g, picks) {
     <table class="tbl"><caption class="sr-only">Mejores apuestas de ${g.home?.name} contra ${g.away?.name}</caption>
       <thead><tr><th scope="col">Apuesta</th><th scope="col">Probabilidad</th><th scope="col">Cuota mínima</th><th scope="col">Se cumplió</th></tr></thead>
       <tbody>${picks.map((p) => h`<tr><td>${star(p)}${pickText(p, g)}</td><td>${fmtPct(p.p, 0)}</td><td><b>${fmtOdds(p.minOdds)}</b></td><td>${recordText(p.record)}</td></tr>`)}</tbody>
-    </table>${picks.some((p) => p.featured) ? h`<p class="hint">★ Mejor predicción del partido (la de mayor probabilidad): es la que cuenta en el registro de Oddsy.</p>` : ''}</section>`;
+    </table>${picks.some((p) => p.featured) ? h`<p class="hint">★ Mejor predicción del partido, la que cuenta en el registro de Oddsy.</p>` : ''}</section>`;
 }
 
 // ---------- registro de Oddsy ----------
@@ -45,8 +45,7 @@ function learnText(m) {
 
 export function recordHtml(r) {
   if (!r) return '';
-  const intro = h`<p class="hint">De cada partido cuenta una sola apuesta: la ★ mejor predicción, la de mayor probabilidad. La guardamos antes de que empiece y la cerramos con el resultado de ESPN. No borramos las perdidas.</p>`;
-  if (!r.since) return h`<section class="card pk-record"><h2>Registro de Oddsy</h2>${intro}<p>El registro empieza con el próximo partido que tenga pick.</p></section>`;
+  if (!r.since) return h`<section class="card pk-record"><h2>Registro de Oddsy</h2><p>El registro empieza con el próximo partido que tenga pick.</p></section>`;
   const day = r.day;
   const g = (p) => ({ home: { name: p.home }, away: { name: p.away } });
   const list = day ? h`<ul class="pk-list">${day.picks.map((p) => {
@@ -55,10 +54,9 @@ export function recordHtml(r) {
   })}</ul>` : '';
   const totals = [totalLine('Últimos 7 días', r.windows?.[0]), totalLine('Últimos 30 días', r.windows?.[1]), totalLine('Todos los picks de la lista (30 días)', r.all)];
   const started = !day && totals.every((t) => !t) ? h`<p>El registro empezó el ${fmtDay(r.since)}. El primer resultado sale cuando termine el primer partido con pick.</p>` : '';
-  return h`<section class="card pk-record"><h2>${day ? `Registro de Oddsy · ${dayTitle(day)}` : 'Registro de Oddsy'}</h2>${intro}${list}${started}
+  return h`<section class="card pk-record"><h2>${day ? `Registro de Oddsy · ${dayTitle(day)}` : 'Registro de Oddsy'}</h2>${list}${started}
     <ul class="pk-totals">${totals}</ul>
     <details><summary>Cómo aprende Oddsy</summary>
-      <p class="hint">Cada noche compara lo que prometió con lo que salió, por mercado y por liga, y ajusta sus probabilidades. Solo usa el ajuste si en las dos semanas más recientes, que no usó para aprender, habría acertado mejor.</p>
       ${r.markets?.length ? h`<table class="tbl"><caption class="sr-only">Prometido contra salido por mercado, últimos 30 días</caption>
         <thead><tr><th scope="col">Mercado</th><th scope="col">Picks</th><th scope="col">Prometía</th><th scope="col">Salió</th></tr></thead>
         <tbody>${r.markets.map((m) => h`<tr><td>${MARKET_NAMES[m.market] ?? m.market}</td><td>${m.n}</td><td>${fmtPct(m.promised, 0)}</td><td>${fmtPct(m.hit, 0)}</td></tr>`)}</tbody></table>` : ''}
@@ -97,7 +95,7 @@ export default {
     const rows = res.flatMap(([, pk]) => pk.data ?? []).map((x) => [games.get(x.gameId), x.picks.filter((p) => p.p >= 0.5)])
       .filter(([g, ps]) => g?.status?.state === 'pre' && ps.length).sort(([a], [b]) => a.start.localeCompare(b.start));
     el.innerHTML = h`<div data-record>${recordHtml(record)}</div><header class="view-head"><div><h1>Mejores apuestas · ${lg.title}</h1>
-      <p class="hint">Lo más probable de cada partido, de hoy a pasado mañana. Apuesta solo si tu casa paga <b>la cuota mínima o más</b>; si paga menos, pierdes plata a la larga. «Se cumplió» es cuántas veces acertó esa apuesta la temporada pasada.</p></div></header>
+      <p class="hint">Apuesta solo si tu casa paga <b>la cuota mínima o más</b>.</p></div></header>
       ${acc?.publish === false ? empty('Aún no mostramos apuestas en esta liga: Oddsy todavía no supera a los resultados de la temporada pasada.')
         : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps]) => gameCard(g, ps))}` : empty('No hay partidos próximos con apuestas de al menos 50%.')}`;
     el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, 8, record, `${location.origin}${location.pathname}#/${lg.id}/picks`))}`, '_blank', 'noopener'));

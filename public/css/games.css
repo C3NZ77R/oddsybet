@@ -43,9 +43,6 @@
 .gm-sel[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--teal); }
 .gm-sel-sm { display: inline-flex; padding: 4px 10px; font-size: 14px; }
 .gm-foot { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
-.gm-public { flex: 1 1 200px; font-size: 13px; }
-.gm-public summary { cursor: pointer; color: var(--muted); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
-.gm-public p { margin: 6px 0 0; color: var(--muted); }
 .gm-more { color: var(--teal); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; text-decoration: none; white-space: nowrap; }
 .gm-more:hover { text-decoration: underline; }
 
@@ -97,17 +94,11 @@
 .gm-acc > summary h3 { margin: 0; flex: 1; }
 .gm-acc > summary:hover h3 { color: var(--teal); }
 .gm-fav { font-size: 12px; font-weight: 700; color: var(--teal); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-variant-numeric: tabular-nums; }
-.gm-hint { margin: 8px 0 4px; color: var(--muted); font-size: 13px; }
 .gm-pc { display: inline-flex; align-items: center; gap: 6px; }
 .gm-pbar { flex: none; width: clamp(22px, 6vw, 72px); height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .gm-pbar i { display: block; height: 100%; background: var(--muted); }
 .gm-top1 .gm-pbar i { background: var(--teal); }
 .gm-tag { color: var(--teal); font-size: 12px; font-weight: 700; }
-.gm-how { font-size: 13px; }
-.gm-how summary { cursor: pointer; color: var(--teal); font-weight: 600; font-size: 12px; }
-.gm-how dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; color: var(--muted); }
-.gm-how dt { color: var(--text); font-weight: 600; }
-.gm-how dd { margin: 0; }
 .gm-rank { color: var(--muted); }
 .gm-rt td { text-align: center; }
 
@@ -143,7 +134,6 @@
   .gm-main, .gm-side { padding: 10px; }
   .gm-tag { display: block; }
   .gm-more, .gm-back { display: inline-block; padding: 12px 0; margin: -12px 0; }
-  .gm-public summary, .gm-how summary, .gm-acc > summary { padding: 10px 0; }
   .gm-sel-sm { min-height: 44px; }
 }
 

@@ -612,8 +612,7 @@ async function renderDetail(el, ctx) {
     return `${defense}
       ${table('Rankings de la temporada', gd.teamStats?.away, gd.teamStats?.home, statCell) || '<p class="pp-muted">ESPN no publica estadísticas de equipo para este partido.</p>'}
       ${table('Récords', gd.records?.away, gd.records?.home, recCell)}
-      ${gd.ats ? table('Contra el hándicap', gd.ats.away, gd.ats.home, recCell) : ''}
-      <h3>Apuestas del público</h3><p class="pp-muted">No hay una fuente gratuita para este dato.</p>`;
+      ${gd.ats ? table('Contra el hándicap', gd.ats.away, gd.ats.home, recCell) : ''}`;
   }
   function lineupPanel() {
     if (!gd?.home) return '<p class="pp-muted">Sin partido: no hay alineaciones ni lesiones.</p>';

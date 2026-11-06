@@ -99,8 +99,7 @@ export default {
     let games = [], err = null, typedAt = 0, okAt = 0, paused = false, last = '', lastNote = '', order = [], sigOrder = [];
 
     el.innerHTML = h`<header class="view-head"><div><h1>En vivo · ${lg.title}</h1>
-      <p class="hint">Te avisamos cuando un jugador o el marcador van más rápido o más lento de lo esperado. Escribe la línea de tu casa y te mostramos lo que estima Oddsy. No son picks: tú decides.</p>
-      <p class="hint"><small>Se actualiza cada 15 s. ESPN publica las jugadas unos 6 minutos tarde: revisa el marcador y el precio en tu casa antes de apostar.</small></p></div></header>
+      <p class="hint"><small>ESPN publica las jugadas unos 6 minutos tarde: revisa el precio en tu casa antes de apostar.</small></p></div></header>
       <div class="lv-bar"><span class="hint" data-age></span><button type="button" class="btn sm" data-pause aria-pressed="false">Pausar actualización</button></div>
       <p class="lv-note" role="status" data-note></p>
       <div data-body></div>`;
