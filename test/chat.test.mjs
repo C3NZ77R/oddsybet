@@ -4,12 +4,11 @@ import { chat, parseBody, rateOk } from '../lib/chat.mjs';
 
 const ok = (text) => async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }) });
 
-test('parseBody valida mensajes y línea', () => {
-  const b = parseBody(JSON.stringify({ messages: [{ role: 'user', text: 'hola' }], check: { league: 'nba', player: 'Stephen Curry', stat: '3pm', line: '3.5', side: 'Over' } }));
-  assert.equal(b.check.line, 3.5);
+test('parseBody valida los mensajes', () => {
+  const b = parseBody(JSON.stringify({ messages: [{ role: 'user', text: 'hola' }] }));
+  assert.equal(b.messages.length, 1);
   assert.throws(() => parseBody('{'), /inválido/);
   assert.throws(() => parseBody(JSON.stringify({ messages: [{ role: 'model', text: 'x' }] })), /mensaje/);
-  assert.throws(() => parseBody(JSON.stringify({ messages: [{ role: 'user', text: 'a' }], check: { player: '<x>', line: 1 } })), /Línea/);
 });
 
 test('chat devuelve la respuesta de Gemini y manda la llave por cabecera', async () => {
@@ -39,4 +38,20 @@ test('chat prueba el modelo de respaldo si el principal da 503', async () => {
   const r = await chat({ messages: [{ role: 'user', text: 'hola' }] }, { key: 'K', fetch });
   assert.equal(r.reply, 'Posible');
   assert.equal(urls.length, 2);
+});
+
+test('Gemini interpreta el mensaje, llama a check_line y responde con esos datos', async () => {
+  const bodies = [];
+  const fetch = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return bodies.length === 1
+      ? { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ functionCall: { name: 'check_line', args: { league: 'nba', player: 'Stephen Curry', stat: '3pm', line: 3.5, side: 'Over' } } }] } }] }) }
+      : ok('Confiable')();
+  };
+  let got;
+  const r = await chat({ messages: [{ role: 'user', text: 'curry mas de 3.5 triples' }] }, { key: 'K', fetch, run: async (a) => (got = a, { last5: { pct: 80 } }) });
+  assert.equal(r.reply, 'Confiable');
+  assert.deepEqual([got.player, got.stat, got.line, got.side], ['Stephen Curry', '3pm', 3.5, 'Over']);
+  const fr = bodies[1].contents.at(-1).parts[0].functionResponse;
+  assert.equal(fr.response.last5.pct, 80);
 });

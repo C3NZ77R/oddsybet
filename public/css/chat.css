@@ -10,9 +10,6 @@
 .chat-msg { max-width: 88%; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-msg.model { align-self: flex-start; background: var(--panel-2); }
 .chat-msg.user { align-self: flex-end; background: var(--teal); color: var(--on-accent); }
-.chat-line { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--line); }
-.chat-line .chat-hint, .chat-line input:nth-of-type(1), .chat-line .btn { grid-column: 1 / -1; }
-.chat-hint { margin: 0; color: var(--muted); font-size: 12px; }
 .chat-free { display: flex; gap: 6px; padding: 8px 12px 12px; }
 .chat-free input { flex: 1; min-width: 0; }
 .chat input, .chat select, .chat .btn { min-height: 44px; font-size: 16px; }
