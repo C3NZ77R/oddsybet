@@ -107,6 +107,7 @@ const ROUTES = {
 const EDGE_S = { '/api/live': 10, '/api/plays': 10, '/api/games': 15, '/api/game': 15, '/api/markets': 1800, '/api/picks': 1800, '/api/record': 300, '/api/props': 1800, '/api/accuracy': 86400, '/api/tennis/rankings': 3600, '/api/tennis/player': 1800 };
 const json = (res, status, body, edge = 0) => res.writeHead(status, {
   'content-type': 'application/json; charset=utf-8',
+  'x-content-type-options': 'nosniff',
   'cache-control': edge ? `public, max-age=0, s-maxage=${edge}, stale-while-revalidate=${edge * 4}` : 'no-store',
 }).end(JSON.stringify(body));
 
@@ -167,6 +168,7 @@ export async function handler(req, res) {
       const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress).split(',')[0].trim();
       if (!rateOk(ip)) throw espn.httpError(429, 'Demasiados mensajes seguidos. Espera un minuto.');
       let raw = '';
+      req.setEncoding('utf8'); // sin esto, un carácter multibyte partido entre trozos se corrompe
       for await (const c of req) if ((raw += c).length > 20_000) throw espn.httpError(413, 'Mensaje muy largo');
       json(res, 200, await chat(parseBody(raw), { key: process.env.GEMINI_API_KEY }));
       return;
@@ -183,7 +185,11 @@ export async function handler(req, res) {
     const content = await readFile(file).catch(() => {
       throw Object.assign(new Error('No encontrado'), { status: 404 });
     });
-    res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(content);
+    res.writeHead(200, {
+      'content-type': TYPES[path.extname(file)] || 'application/octet-stream',
+      'cache-control': 'public, max-age=0, must-revalidate',
+      'x-content-type-options': 'nosniff',
+    }).end(content);
   } catch (err) {
     const status = err.status || (err instanceof URIError ? 400 : 502);
     json(res, status, { error: err.status ? err.message : status === 400 ? 'Ruta inválida' : 'Error al consultar los datos' });

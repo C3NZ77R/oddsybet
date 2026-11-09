@@ -51,3 +51,13 @@ test('fetchJson: una entrada recién renovada no es la próxima en salir de la c
   await fetchJson(a);
   assert.equal(calls.filter((u) => u === a).length, 2);
 }));
+
+test('fetchJson: si ESPN falla al renovar, sirve la última respuesta buena y reintenta pronto', () => withFetch((_, n) => (n === 2 ? new Response('{}', { status: 500 }) : ok({ n })), async (calls) => {
+  const url = 'https://x.test/vieja';
+  assert.deepEqual(await fetchJson(url, 1), { n: 1 });
+  await new Promise((r) => setTimeout(r, 5));
+  assert.deepEqual(await fetchJson(url, 1), { n: 1 }); // la renovación falló: copia vieja
+  assert.equal(calls.length, 2);
+  assert.deepEqual(await fetchJson(url, 1), { n: 1 }); // dentro de la ventana de reintento no vuelve a pedir
+  assert.equal(calls.length, 2);
+}));
