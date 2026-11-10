@@ -49,7 +49,7 @@ function selBtn(g, m, s, ctx, compact = false) {
   const pick = { id: `oddsy:${ctx.league}:${g.id}:${m.key}:${m.label}${s.line != null ? ` ${Math.abs(s.line)}` : ''}:${s.name}`, label: `${name} (${m.label}) · ${matchup}`, price: s.oddsy, book: 'oddsy', league: ctx.league, gameId: g.id };
   ctx.picks.push(pick);
   return `<button type="button" class="gm-sel${compact ? ' gm-sel-sm' : ''}" data-pick="${ctx.picks.length - 1}" aria-pressed="${ctx.store.hasPick(pick.id)}" aria-label="${esc(`${name}: probabilidad ${ui.fmtPct(s.p)}, justa ${ui.fmtOdds(s.fair)}, Oddsy ${ui.fmtOdds(s.oddsy)}. Agregar a Mis picks`)}">${compact ? `<b>${esc(ui.fmtOdds(s.oddsy))}</b></button>` : `
-    <b>${esc(name)}</b><small>${esc(ui.fmtPct(s.p))}</small><span>Justa ${esc(ui.fmtOdds(s.fair))} · Oddsy <b>${esc(ui.fmtOdds(s.oddsy))}</b></span></button>`}`;
+    <b>${esc(name)}</b><strong>${esc(ui.fmtPct(s.p))}</strong><span>Oddsy <b>${esc(ui.fmtOdds(s.oddsy))}</b></span><small>Justa ${esc(ui.fmtOdds(s.fair))}</small></button>`}`;
 }
 // Clic en una selección: alterna el pick en el boleto.
 function onPickClick(e, ctx) {

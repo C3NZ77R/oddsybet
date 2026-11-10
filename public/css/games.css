@@ -36,10 +36,12 @@
 .gm-line { color: var(--muted); font-size: 12px; }
 /* Cuotas del modelo: selección con probabilidad, justa y Oddsy (botón que agrega al boleto) */
 .gm-teams { display: grid; gap: 8px; }
-.gm-mkh { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.gm-mkh { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 10px; color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
 .gm-sels { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; }
-.gm-sel { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 4px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; color: var(--text); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; min-width: 0; }
+.gm-sel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 6px 4px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; color: var(--text); font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; min-width: 0; }
 .gm-sel:hover { border-color: var(--teal); }
+.gm-sel > b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gm-sel strong { font-size: 18px; font-weight: 800; line-height: 1.25; }
 .gm-sel small, .gm-sel span { color: var(--muted); font-size: 12px; }
 .gm-sel span b { color: var(--text); font-size: 13px; }
 .gm-sel[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--teal); }
@@ -89,17 +91,18 @@
 .gm-mk tbody th, .gm-player tbody th { font-weight: 600; color: var(--text); font-size: 13px; }
 /* Mercados del modelo: desplegable con la opción más probable a la vista y barra de probabilidad */
 .gm-acc { border-top: 1px solid var(--line); padding-top: 10px; }
-.gm-acc > summary { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; cursor: pointer; list-style: none; }
+.gm-acc > summary { position: relative; display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; padding-right: 20px; cursor: pointer; list-style: none; }
 .gm-acc > summary::-webkit-details-marker { display: none; }
-.gm-acc > summary::after { content: "▾"; color: var(--muted); transition: transform .15s; }
+.gm-acc > summary::after { content: "▾"; position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; color: var(--muted); transition: transform .15s; } /* fuera del flujo: nunca queda sola en una línea */
 .gm-acc:not([open]) > summary::after { transform: rotate(-90deg); }
-.gm-acc > summary h3 { margin: 0; flex: 1; }
+.gm-acc > summary h3 { margin: 0; flex: 1 1 auto; } /* base auto: si el título no cabe con el chip, el chip baja de línea */
 .gm-acc > summary:hover h3 { color: var(--teal); }
 .gm-fav { font-size: 12px; font-weight: 700; color: var(--teal); background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-variant-numeric: tabular-nums; }
 .gm-pc { display: inline-flex; align-items: center; gap: 6px; }
 .gm-pbar { flex: none; width: clamp(22px, 6vw, 72px); height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .gm-pbar i { display: block; height: 100%; background: var(--muted); }
 .gm-top1 .gm-pbar i { background: var(--teal); }
+.gm-top1 .gm-pc { color: var(--teal); font-weight: 700; }
 .gm-tag { color: var(--teal); font-size: 12px; font-weight: 700; }
 .gm-rank { color: var(--muted); }
 .gm-rt td { text-align: center; }
@@ -136,7 +139,18 @@
   .gm-main, .gm-side { padding: 10px; }
   .gm-tag { display: block; }
   .gm-more, .gm-back { display: inline-block; padding: 12px 0; margin: -12px 0; }
-  .gm-sel-sm { min-height: 44px; }
+  .gm-sel-sm { min-height: 44px; min-width: 56px; }
+  /* La justa es 1/probabilidad: en el celular repite el porcentaje y solo satura */
+  .gm-sels .gm-sel small, .gm-mt tr > :nth-child(3) { display: none; }
+  .gm-sels .gm-sel { padding: 8px 4px; }
+  .gm-mt thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .gm-mt td:nth-child(2) { width: 100%; } /* la barra se queda con el ancho sobrante */
+  .gm-mt .gm-pc { display: flex; }
+  .gm-mt .gm-pbar { flex: 1; width: auto; height: 8px; }
+  .gm-mk .gm-mt tr > * { padding: 10px 6px; }
+  .gm-mt tr > :first-child { padding-left: 0; }
+  .gm-mt tr > :last-child { padding-right: 0; }
+  .gm-acc > summary h3 { font-size: 14px; }
 }
 
-.gm-acc-chip { float: right; font-weight: 500; text-transform: none; letter-spacing: 0; cursor: help; }
+.gm-acc-chip { font-weight: 500; text-transform: none; letter-spacing: 0; cursor: help; }
