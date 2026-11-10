@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { normDay, surfaceOf } from '../lib/challenger.mjs';
+import { normDay, surfaceOf, liveDays, MAX_LIVE_DAYS } from '../lib/challenger.mjs';
+import { mergeRows } from '../scripts/challenger-snapshot.mjs';
 import { finished } from '../lib/tennis.mjs';
 
 const fx = () => JSON.parse(readFileSync(new URL('./fixtures/livescore-tennis.json', import.meta.url), 'utf8'));
@@ -56,4 +57,18 @@ test('challenger: getMarkets cotiza los del día con el Elo del Challenger y la 
   } finally {
     globalThis.fetch = real;
   }
+});
+
+test('challenger: los días en vivo van desde dos antes del último del snapshot hasta hoy, con tope', () => {
+  const now = Date.parse('2026-11-10T15:00:00Z');
+  assert.deepEqual(liveDays([{ date: '2026-11-08T20:00:00Z' }], now), ['20261106', '20261107', '20261108', '20261109', '20261110']);
+  const old = liveDays([{ date: '2026-01-01T00:00:00Z' }], now);
+  assert.equal(old.length, MAX_LIVE_DAYS + 1); // workflow caído: no más que el tope
+  assert.equal(old.at(-1), '20261110');
+  assert.equal(liveDays([], now).length, MAX_LIVE_DAYS + 1); // sin snapshot
+});
+
+test('challenger: el snapshot suma sin borrar; la fila nueva gana y queda por fecha', () => {
+  const old = [['ls1', '2026-01-02', 'h'], ['ls2', '2026-01-01', 'h']];
+  assert.deepEqual(mergeRows(old, [['ls1', '2026-01-02', 'c'], ['ls3', '2026-01-03', 'h']]), [['ls2', '2026-01-01', 'h'], ['ls1', '2026-01-02', 'c'], ['ls3', '2026-01-03', 'h']]);
 });

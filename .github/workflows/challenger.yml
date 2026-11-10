@@ -1,0 +1,33 @@
+# Cada lunes: suma a data/challenger-elo.json los partidos del Challenger de la semana (LiveScore guarda ~1 año; lo más
+# viejo solo vive en el repo), recalcula la precisión publicada (docs/accuracy.json → challenger) y, si los tests pasan,
+# lo sube a main: Vercel lo despliega. Si deja de correr, la app pide en vivo hasta 60 días (MAX_LIVE_DAYS).
+name: Historial del Challenger
+on:
+  schedule:
+    - cron: '17 11 * * 1' # lunes 06:17 en Bogotá
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: challenger
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/challenger-snapshot.mjs
+      - run: node scripts/backtest.mjs challenger
+      - run: node --test
+      - name: Subir a main
+        run: |
+          git diff --quiet -- data/challenger-elo.json docs/accuracy.json && exit 0
+          # Autor del dueño del repo: Vercel (Hobby, repo privado) no despliega commits de autores fuera del equipo.
+          git config user.name "Camilo"
+          git config user.email "c4milopsd@gmail.com"
+          git add data/challenger-elo.json docs/accuracy.json
+          git commit -m "Challenger: historial y precisión de la semana"
+          git pull --rebase origin main
+          git push origin HEAD:main
