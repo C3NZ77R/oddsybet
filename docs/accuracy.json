@@ -2958,8 +2958,9 @@
     "season": 2026,
     "from": "2026-05-01",
     "n": 4175,
-    "brier": 0.2367,
-    "logloss": 0.6665,
+    "brier": 0.2339,
+    "logloss": 0.66,
+    "slope": 0.7,
     "baseline": {
       "brier": 0.2441,
       "logloss": 0.6812

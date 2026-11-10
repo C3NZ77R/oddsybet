@@ -16,7 +16,7 @@ import { getPastSeason, thinSeason, uniqueById } from '../lib/espn.mjs';
 import { ratingsFromResults, expected, SPORT_MODEL, SIGMA, SIGMA_T, MU_SHRINK } from '../lib/ratings.mjs';
 import { marketsFor } from '../lib/markets.mjs';
 import { finished, matchProb, eloStep, eloSnapshot } from '../lib/tennis.mjs';
-import { challengerSnapshot } from '../lib/challenger.mjs';
+import { challengerSnapshot, NEW_DROP, calibrate } from '../lib/challenger.mjs';
 
 export const LAG = 6 * 3_600_000;
 const DAY = 86_400_000;
@@ -202,9 +202,8 @@ export { eloStep }; // el test comprueba que la pasada incremental deja lo mismo
 // El Elo de un jugador solo cambia con sus partidos, así que no hay fuga. Los retiros no se miden (eloFrom los ignora).
 // season: el año o un filtro de partidos (Challenger: los de su circuito tras la quema del Elo).
 const yearIs = (season) => (typeof season === 'function' ? season : (m) => new Date(m.date).getUTCFullYear() === season);
-export function predictAtp(matches, season) {
+export function predictAtp(matches, season, elo = new Map()) {
   const inTest = yearIs(season);
-  const elo = new Map();
   const out = [];
   for (const m of finished(matches)) {
     if (!m.retired && inTest(m)) {
@@ -253,15 +252,20 @@ async function atpEntry() {
 }
 
 // Challenger (data/challenger-elo.json, LiveScore desde octubre de 2025): se mide desde CH_TEST, con 7 meses de quema del
-// Elo, solo en partidos del Challenger; la forma ajusta su c en los tres meses previos.
+// Elo, solo en partidos del Challenger. En los tres meses previos se ajustan la pendiente que aplana la P del Elo (slope,
+// la usa tennisMarkets) y el c de la forma: la prueba no ve su propio ajuste.
 const CH_TEST = '2026-05-01', CH_FIT = '2026-02-01';
 async function challengerEntry() {
   const matches = finished(uniqueById(challengerSnapshot()));
   const ch = (m) => m.level === 'challenger';
   const test = (m) => ch(m) && m.date >= CH_TEST, fit = (m) => ch(m) && m.date >= CH_FIT && m.date < CH_TEST;
-  const m = scoreAtp(predictAtp(matches, test));
+  const preds = (f) => predictAtp(matches, f, Object.assign(new Map(), { newDrop: NEW_DROP }));
+  const at = (c, ps) => scoreAtp(ps.map((x) => ({ ...x, p: calibrate(x.p, c) })));
+  const fitPreds = preds(fit);
+  const slope = Array.from({ length: 41 }, (_, i) => 0.6 + i / 50).reduce((a, c) => (at(c, fitPreds).logloss < at(a, fitPreds).logloss ? c : a));
+  const m = at(slope, preds(test));
   const b = formBaseline(matches, null, { test, fit });
-  const out = { season: Number(CH_TEST.slice(0, 4)), from: CH_TEST, n: m.n, brier: r4(m.brier), logloss: r4(m.logloss), baseline: { brier: r4(b.brier), logloss: r4(b.logloss) } };
+  const out = { season: Number(CH_TEST.slice(0, 4)), from: CH_TEST, n: m.n, brier: r4(m.brier), logloss: r4(m.logloss), slope: r2(slope), baseline: { brier: r4(b.brier), logloss: r4(b.logloss) } };
   return { ...out, publish: out.brier < out.baseline.brier,
     note: 'Partidos del Challenger desde mayo de 2026. La referencia es la forma: victorias de cada jugador en las 52 semanas previas.' };
 }

@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { normDay, surfaceOf, liveDays, MAX_LIVE_DAYS } from '../lib/challenger.mjs';
+import { normDay, surfaceOf, liveDays, MAX_LIVE_DAYS, calibrate, NEW_DROP } from '../lib/challenger.mjs';
+import { eloStep, ratingOf } from '../lib/tennis.mjs';
 import { mergeRows } from '../scripts/challenger-snapshot.mjs';
 import { finished } from '../lib/tennis.mjs';
 
@@ -71,4 +72,18 @@ test('challenger: los días en vivo van desde dos antes del último del snapshot
 test('challenger: el snapshot suma sin borrar; la fila nueva gana y queda por fecha', () => {
   const old = [['ls1', '2026-01-02', 'h'], ['ls2', '2026-01-01', 'h']];
   assert.deepEqual(mergeRows(old, [['ls1', '2026-01-02', 'c'], ['ls3', '2026-01-03', 'h']]), [['ls2', '2026-01-01', 'h'], ['ls1', '2026-01-02', 'c'], ['ls3', '2026-01-03', 'h']]);
+});
+
+test('challenger: la pendiente aplana la P hacia 0.5 sin cambiar el favorito; sin pendiente, igual', () => {
+  for (const p of [0.2, 0.5, 0.74]) assert.ok(Math.abs(calibrate(p) - p) < 1e-12);
+  assert.ok(Math.abs(calibrate(0.74, 0.7) - 0.6753) < 1e-3); // σ(0.7·logit 0.74)
+  assert.ok(Math.abs(calibrate(0.26, 0.7) + calibrate(0.74, 0.7) - 1) < 1e-12); // simétrica
+});
+
+test('challenger: pasada la quema, un jugador nuevo arranca NEW_DROP abajo (la ATP sigue con 100)', () => {
+  const m = (date) => ({ date, state: 'post', winner: 'a', retired: false, surface: 'hard', a: { id: 'x' }, b: { id: 'y' }, sets: [[6, 4], [6, 4]] });
+  const ch = Object.assign(new Map(), { newDrop: NEW_DROP }), atp = new Map();
+  for (const e of [ch, atp]) eloStep(e, m('2026-01-01T00:00:00Z')), eloStep(e, m('2026-09-01T00:00:00Z'));
+  assert.equal(ratingOf(ch, 'nuevo').all, 1500 - NEW_DROP);
+  assert.equal(ratingOf(atp, 'nuevo').all, 1400);
 });
