@@ -24,7 +24,7 @@ export function whyText(p, x) {
   const parts = [];
   if (p.pModel != null) parts.push(Math.abs(p.raw - p.pModel) < 0.03 ? `el modelo de Oddsy coincide (${fmtPct(p.pModel, 0)})` : `el modelo de Oddsy solo daba ${fmtPct(p.pModel, 0)}`);
   if (p.pOpen != null && Math.abs(p.raw - p.pOpen) >= 0.03) parts.push(`abrió en ${fmtPct(p.pOpen, 0)} y se movió ${p.raw > p.pOpen ? 'a favor' : 'en contra'}`);
-  return parts.length ? `Con la línea del mercado: ${parts.join(' y ')}.` : 'Con la línea del mercado.';
+  return parts.length ? `Con la línea del mercado: ${parts.join('; ')}.` : 'Con la línea del mercado.';
 }
 
 function gameCard(g, picks, x) {

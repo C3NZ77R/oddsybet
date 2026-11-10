@@ -355,6 +355,6 @@ test('Mejores apuestas: el porqué del pick cotizado con la línea del mercado, 
   assert.equal(whyText({ raw: 0.7 }, { mkt: 1 }), 'Con la línea del mercado.');
   const moved = whyText({ raw: 0.7, pModel: 0.55, pOpen: 0.62 }, { mkt: 1 });
   assert.match(moved, /solo daba 55\s?%/);
-  assert.match(moved, /abrió en 62\s?% y se movió a favor/);
+  assert.match(moved, /solo daba 55\s?%; abrió en 62\s?% y se movió a favor\.$/);
   assert.match(whyText({ raw: 0.6, pOpen: 0.7 }, { mkt: 1 }), /en contra/);
 });
