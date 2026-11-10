@@ -112,3 +112,21 @@ test('currentModel: sin base → null; guarda en memoria 10 min; ante error o ba
   answer = () => { throw new Error('caído'); };
   assert.deepEqual(await currentModel({ db, now: NOW + 22 * 60_000 }), good);
 });
+
+test('fitSport: aprende el sesgo de un lado (el Menos sale más de lo prometido y el Más menos) y lo aplica por lado', async () => {
+  const { sideSign } = await import('../lib/learn.mjs');
+  assert.deepEqual([sideSign('ou_games', 0), sideSign('ou_games', 1), sideSign('1x2', 1), sideSign('1x2', 2), sideSign('dc', 0)], [1, -1, 0, -1, 1]);
+  const r = rng(7);
+  const data = Array.from({ length: 900 }, (_, i) => {
+    const side = i % 3 ? 1 : 0, pRaw = 0.5 + 0.08 * r();
+    return { league: 'atp', market: 'ou_games', side, pRaw, x: {}, gameStart: new Date(NOW - (60 * 864e5 * (i + 0.5)) / 900).toISOString(), won: r() < pRaw + (side ? 0.12 : -0.13) };
+  });
+  const s = fitSport(data, { now: NOW });
+  assert.equal(s.status, 'en_uso');
+  assert.ok(s.markets.ou_games.s < -0.2, `s = ${s.markets.ou_games.s}`);
+  const model = { sports: { tennis: s } };
+  const q = { sport: 'tennis', league: 'atp', market: 'ou_games', p: 0.53, x: {} };
+  assert.ok(applyModel(model, { ...q, side: 1 }) > 0.6);
+  assert.ok(applyModel(model, { ...q, side: 0 }) < 0.45);
+  assert.ok(parseModel(learnModel({ tennis: data }, { now: NOW })), 'lo guardado con s se vuelve a leer');
+});

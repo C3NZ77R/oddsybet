@@ -15,6 +15,9 @@ test('gradePick: fútbol, cada mercado y lado de la tabla del spec', () => {
   assert.equal(st(soc('1x2', 1, null, 1, 1)), 'ganada:1');
   assert.equal(st(soc('1x2', 1, null, 3, 1)), 'perdida:-2');
   assert.equal(st(soc('1x2', 2, null, 2, 1)), 'perdida:-1');
+  assert.equal(st(soc('1x2', 0, null, 1, 1)), 'perdida:-1'); // el empate tumba al Local y al Visitante: no es devuelta
+  assert.equal(st(soc('1x2', 2, null, 0, 0)), 'perdida:-1');
+  assert.equal(st(soc('dnb', 0, null, 1, 1)), 'nula:0'); // en empate no válido sí se devuelve
   assert.equal(st(soc('dc', 0, null, 1, 1)), 'ganada:0.5');
   assert.equal(st(soc('dc', 1, null, 1, 1)), 'perdida:-0.5');
   assert.equal(st(soc('dc', 2, null, 0, 2)), 'ganada:2.5');
