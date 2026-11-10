@@ -358,3 +358,16 @@ test('Mejores apuestas: el porqué del pick cotizado con la línea del mercado, 
   assert.match(moved, /solo daba 55\s?%; abrió en 62\s?% y se movió a favor\.$/);
   assert.match(whyText({ raw: 0.6, pOpen: 0.7 }, { mkt: 1 }), /en contra/);
 });
+
+test('Partidos «Empiezan en»: solo los que no empezaron y arrancan dentro de la ventana, sin repetidos y por hora', async () => {
+  const { startingSoon } = await import('../public/views/games.js');
+  const now = Date.parse('2026-11-09T12:00:00Z');
+  const at = (h) => new Date(now + h * 3_600_000).toISOString();
+  const nba = { id: 'nba' }, wnba = { id: 'wnba' };
+  const it = (id, h, state = 'pre', l = nba) => ({ g: { id, start: at(h), status: { state } }, l, date: '20261109' });
+  const items = [it('a', 5), it('b', 1), it('c', 0.5, 'in'), it('d', -1), it('e', 13), it('b', 1), it('b', 2, 'pre', wnba)];
+  const ids = (h) => startingSoon(items, h, now).map((x) => `${x.l.id}:${x.g.id}`);
+  assert.deepEqual(ids(3), ['nba:b', 'wnba:b']);
+  assert.deepEqual(ids(12), ['nba:b', 'wnba:b', 'nba:a']);
+  assert.deepEqual(ids(24), ['nba:b', 'wnba:b', 'nba:a', 'nba:e']);
+});

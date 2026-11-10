@@ -2,7 +2,7 @@
 // sin tendencias ni récords de equipo; el detalle lleva ?date= para encontrar el partido.
 // Cuotas: solo las del modelo Oddsy (/api/markets): probabilidad, cuota justa y cuota Oddsy. Apuestas del público: sin fuente gratuita.
 import * as bm from '../betmath.js';
-import { leagueById } from '../leagues.js';
+import { LEAGUES, leagueById } from '../leagues.js';
 import { statForMarket } from '../stats.js';
 import { ui as baseUi, dataOf, propKey, ymd } from '../ui.js';
 import { mainTotal } from '../live.js';
@@ -14,6 +14,8 @@ const REFRESH_MS = 60_000;
 const REC_ORDER = ['overall', 'home', 'road', 'vsconf', 'vsdiv'];
 const REC_LABEL = { overall: 'Total', home: 'Local', road: 'Visita', vsconf: 'Conferencia', vsdiv: 'División' };
 const NO_PUBLISH = 'Aún no mostramos cuotas en esta liga: Oddsy todavía no supera a los resultados de la temporada pasada';
+const SOON_H = [3, 12, 24]; // «Empiezan en»: ventanas en horas
+const SPORT_ES = { soccer: 'Fútbol', basketball: 'Básquet', tennis: 'Tenis' };
 
 let ui = baseUi; // ctx.ui de la vista montada (solo hay una a la vez)
 const esc = (s) => ui.esc(s ?? '');
@@ -26,6 +28,11 @@ export const mainMarket = (markets) => markets?.find((m) => m.key === '1x2') ?? 
 export const accText = (acc) => (acc?.brier != null
   ? `Precisión de Oddsy: Brier ${acc.brier.toFixed(3)} en ${acc.n} partidos jugados (menos es mejor). Con solo los resultados de la temporada pasada: ${acc.baseline?.brier?.toFixed(3) ?? '—'}.`
   : 'Precisión de Oddsy: aún sin medir en esta liga.');
+// items = [{ g, l, date }]: los que siguen sin empezar y arrancan en las próximas `hours` horas, sin repetidos y por hora.
+export const startingSoon = (items, hours, now = Date.now()) => [...new Map(items
+  .filter(({ g }) => g.status?.state === 'pre' && Date.parse(g.start) > now && Date.parse(g.start) <= now + hours * 3_600_000)
+  .map((it) => [`${it.l.id}:${it.g.id}`, it])).values()]
+  .sort((a, b) => Date.parse(a.g.start) - Date.parse(b.g.start));
 
 // ---------- piezas de UI ----------
 const timeOf = (iso) => new Date(iso).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
@@ -97,8 +104,9 @@ function cardHtml(g, league, extra) {
   const tennis = extra.ctx.tennis;
   const sides = tennis ? ['home', 'away'] : ['away', 'home']; // en tenis home = jugador A, arriba
   const query = tennis && extra.date ? `?date=${encodeURIComponent(extra.date)}` : '';
-  return `<article class="gm-card" data-id="${esc(g.id)}">
-    <div class="gm-top"><span class="gm-status" data-status>${statusHtml(g)}</span>${g.tournament ? `<span class="gm-event">${esc([g.tournament, g.round].filter(Boolean).join(' · '))}</span>` : ''}</div>
+  const event = [extra.title, g.tournament, g.round].filter(Boolean).join(' · '); // title: liga, en «Empiezan en»
+  return `<article class="gm-card" data-id="${esc(g.id)}" data-league="${esc(league)}">
+    <div class="gm-top"><span class="gm-status" data-status>${statusHtml(g)}${extra.title ? ` · ${esc(ui.ago(g.start))}` : ''}</span>${event ? `<span class="gm-event">${esc(event)}</span>` : ''}</div>
     <div class="gm-teams">${sides.map((side) => teamRow(g, side, tennis)).join('')}</div>
     <div data-main>${mainHtml(g, extra.mk, extra.ctx)}</div>
     <div class="gm-foot">
@@ -140,11 +148,15 @@ async function renderList(root, ctx, lg, state) {
   const { api } = ctx;
   const tennis = lg.sport === 'tennis';
   root.innerHTML = `<header class="gm-header"><h1>Partidos · ${esc(lg.title)}</h1>${lg.id === 'atp' ? '<a class="gm-more" href="#/tennis-rankings">Ranking ATP →</a>' : ''}<span class="gm-badges" data-badges></span></header>
+    <nav class="gm-dates gm-soon" aria-label="Empiezan pronto" data-soonbar></nav>
     <nav class="gm-dates" aria-label="Fechas" data-dates></nav>
     <p class="gm-livebar" data-livebar hidden><button type="button" class="btn sm" data-pause aria-pressed="false">Pausar actualización</button></p>
     <div class="gm-list" data-list>${ui.loading()}</div>
     <p class="gm-src" data-note hidden></p>`;
 
+  const q = ctx.query;
+  state.soon = SOON_H.find((h) => String(h) === q?.get('soon')) ?? 0; // 0: lista por fecha
+  state.sport = LEAGUES.some((l) => l.sport === q?.get('sport')) ? q.get('sport') : lg.sport;
   const today = new Date();
   const days = Array.from({ length: tennis ? TENNIS_DAYS : DAYS }, (_, i) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + i));
   const res = await Promise.allSettled(days.map((d) => api.games(lg.id, ymd(d)).then(dataOf)));
@@ -153,28 +165,22 @@ async function renderList(root, ctx, lg, state) {
   res.forEach((r, i) => {
     if (r.status === 'fulfilled' && r.value?.length) byDate.set(ymd(days[i]), r.value);
   });
-  if (!byDate.size) {
-    const err = res.find((r) => r.status === 'rejected');
-    root.querySelector('[data-list]').innerHTML = err && res.every((r) => r.status === 'rejected')
-      ? ui.errorBox(err.reason)
-      : ui.empty(`No hay partidos de ${lg.title} programados entre hoy y los próximos ${days.length - 1} días.`);
-    return;
-  }
 
   root.querySelector('[data-badges]').innerHTML = ui.sourceBadge(lg.id === 'challenger' ? 'livescore' : 'espn') + ui.sourceBadge('oddsy');
   const pc = { league: lg.id, store: ctx.store, picks: [], tennis };
   state.cleanups.push(syncPicks(root, pc));
-  // Cuotas del modelo por fecha: se piden al elegir el día y quedan en caché.
-  const marketsOf = (date) => {
-    if (!state.markets.has(date)) {
-      state.markets.set(date, api.markets(lg.id, null, date)
+  // Cuotas del modelo por liga y fecha: se piden al dibujar y quedan en caché.
+  const marketsOf = (date, league = lg.id) => {
+    const key = `${league}/${date}`;
+    if (!state.markets.has(key)) {
+      state.markets.set(key, api.markets(league, null, date)
         .then((r) => ({ accuracy: r.accuracy, by: new Map((r.data ?? []).map((x) => [String(x.gameId), x.markets])) }))
         .catch((error) => {
-          state.markets.delete(date); // se reintenta al volver a dibujar
+          state.markets.delete(key); // se reintenta al volver a dibujar
           return { error };
         }));
     }
-    return state.markets.get(date);
+    return state.markets.get(key);
   };
 
   const dates = [...byDate.keys()];
@@ -188,18 +194,31 @@ async function renderList(root, ctx, lg, state) {
     return s[0].toUpperCase() + s.slice(1);
   };
   const drawDates = () => {
-    root.querySelector('[data-dates]').innerHTML = dates.map((k) => `<button type="button" data-date="${k}" aria-pressed="${k === state.date}">${esc(label(k))} <small>${byDate.get(k).length}</small></button>`).join('');
+    root.querySelector('[data-dates]').innerHTML = dates.map((k) => `<button type="button" data-date="${k}" aria-pressed="${!state.soon && k === state.date}">${esc(label(k))} <small>${byDate.get(k).length}</small></button>`).join('');
+  };
+  // Las ventanas siempre; los deportes solo con una ventana elegida.
+  const drawSoonBar = () => {
+    root.querySelector('[data-soonbar]').innerHTML = `<span>Empiezan en</span>${SOON_H.map((h) => `<button type="button" data-soon="${h}" aria-pressed="${h === state.soon}">${h} h</button>`).join('')}${
+      state.soon ? Object.entries(SPORT_ES).map(([id, name]) => `<button type="button" data-sport="${id}" aria-pressed="${id === state.sport}">${name}</button>`).join('') : ''}`;
+  };
+  const setQuery = (qs) => {
+    try {
+      history.replaceState(null, '', `#/${lg.id}/games?${qs}`);
+    } catch { /* sin history: no pasa nada */ }
   };
 
-  const io = tennis ? null : 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
+  const io = 'IntersectionObserver' in window ? new IntersectionObserver((entries) => {
     for (const en of entries) if (en.isIntersecting) { io.unobserve(en.target); loadTrend(en.target); }
   }, { rootMargin: '200px' }) : null;
   state.cleanups.push(() => io?.disconnect());
+  const watchTrends = (list) => {
+    for (const card of list.querySelectorAll('.gm-card')) if (card.querySelector('[data-trend]')) io ? io.observe(card) : loadTrend(card);
+  };
 
   // Tendencia de cada lado desde GameDetail.lastFive (se pide solo para las tarjetas visibles).
   const loadTrend = async (card) => {
     const id = card.dataset.id;
-    if (!state.details.has(id)) state.details.set(id, api.game(lg.id, id).then(dataOf).catch(() => null));
+    if (!state.details.has(id)) state.details.set(id, api.game(card.dataset.league, id).then(dataOf).catch(() => null));
     const d = await state.details.get(id);
     if (state.dead || !card.isConnected) return;
     for (const side of ['away', 'home']) {
@@ -209,18 +228,26 @@ async function renderList(root, ctx, lg, state) {
   };
 
   const drawList = () => {
-    const games = [...byDate.get(state.date)].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+    const my = ++state.draw; // otro dibujo (fecha o «Empiezan en») descarta las cuotas que lleguen tarde
     const list = root.querySelector('[data-list]');
+    if (!byDate.size) {
+      const err = res.find((r) => r.status === 'rejected');
+      list.innerHTML = err && res.every((r) => r.status === 'rejected')
+        ? ui.errorBox(err.reason)
+        : ui.empty(`No hay partidos de ${lg.title} programados entre hoy y los próximos ${days.length - 1} días.`);
+      return;
+    }
+    const games = [...byDate.get(state.date)].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
     const date = state.date;
     const spot = focusSpot(list, document.activeElement);
     root.querySelector('[data-livebar]').hidden = !games.some(isLive);
     io?.disconnect();
     pc.picks = [];
     list.innerHTML = games.map((g) => cardHtml(g, lg.id, { mk: null, ctx: pc, date })).join('');
-    if (!tennis) for (const card of list.querySelectorAll('.gm-card')) io ? io.observe(card) : loadTrend(card);
+    watchTrends(list);
     const note = root.querySelector('[data-note]');
     marketsOf(date).then((mk) => {
-      if (state.dead || date !== state.date) return;
+      if (state.dead || my !== state.draw) return;
       for (const g of games) {
         const slot = list.querySelector(`.gm-card[data-id="${CSS.escape(String(g.id))}"] [data-main]`);
         if (slot) slot.innerHTML = mainHtml(g, mk, pc);
@@ -232,8 +259,43 @@ async function renderList(root, ctx, lg, state) {
     });
   };
 
+  // «Empiezan en»: partidos de todas las ligas del deporte elegido que arrancan en las próximas state.soon horas.
+  // shortcut: pide hoy y mañana en fecha local; si ESPN agrupa por otra zona horaria puede faltar alguno de madrugada al borde de las 24 h.
+  const drawSoon = async () => {
+    const my = ++state.draw;
+    const { soon: hours, sport } = state;
+    const list = root.querySelector('[data-list]');
+    list.innerHTML = ui.loading();
+    root.querySelector('[data-livebar]').hidden = true;
+    root.querySelector('[data-note]').hidden = true;
+    const pairs = LEAGUES.filter((l) => l.sport === sport).flatMap((l) => days.slice(0, 2).map((d) => [l, ymd(d)]));
+    const got = await Promise.allSettled(pairs.map(([l, date]) => api.games(l.id, date).then(dataOf)));
+    if (state.dead || my !== state.draw) return;
+    const items = startingSoon(got.flatMap((r, i) => (r.value ?? []).map((g) => ({ g, l: pairs[i][0], date: pairs[i][1] }))), hours);
+    if (!items.length) {
+      list.innerHTML = got.every((r) => r.status === 'rejected')
+        ? ui.errorBox(got[0].reason)
+        : ui.empty(`Ningún partido de ${SPORT_ES[sport].toLowerCase()} empieza en las próximas ${hours} horas.`);
+      return;
+    }
+    io?.disconnect();
+    pc.picks = [];
+    // Cada tarjeta arma sus picks con su liga; comparten pc.picks para que el clic y syncPicks los encuentren.
+    for (const it of items) it.cx = { ...pc, league: it.l.id, tennis: it.l.sport === 'tennis' };
+    list.innerHTML = items.map(({ g, l, date, cx }) => cardHtml(g, l.id, { mk: null, ctx: cx, date, title: l.title })).join('');
+    watchTrends(list);
+    for (const it of items) {
+      marketsOf(it.date, it.l.id).then((mk) => {
+        if (state.dead || my !== state.draw) return;
+        const slot = list.querySelector(`.gm-card[data-id="${CSS.escape(String(it.g.id))}"] [data-main]`);
+        if (slot) slot.innerHTML = mainHtml(it.g, mk, it.cx);
+      });
+    }
+  };
+
+  drawSoonBar();
   drawDates();
-  drawList();
+  state.soon ? drawSoon() : drawList();
 
   root.addEventListener('click', (e) => {
     if (onPickClick(e, pc)) return;
@@ -244,26 +306,36 @@ async function renderList(root, ctx, lg, state) {
       p.textContent = state.paused ? 'Reanudar' : 'Pausar actualización';
       return;
     }
+    const s = e.target.closest('[data-soon], [data-sport]');
+    if (s) {
+      state.soon = Number(s.dataset.soon ?? state.soon);
+      state.sport = s.dataset.sport ?? state.sport;
+      setQuery(`soon=${state.soon}&sport=${state.sport}`);
+      drawSoonBar();
+      drawDates();
+      drawSoon();
+      return;
+    }
     const b = e.target.closest('[data-date]');
     if (!b) return;
+    state.soon = 0;
     state.date = b.dataset.date;
-    try {
-      history.replaceState(null, '', `#/${lg.id}/games?date=${state.date}`);
-    } catch { /* sin history: no pasa nada */ }
+    setQuery(`date=${state.date}`);
+    drawSoonBar();
     drawDates();
     drawList();
   });
 
   // Marcadores en vivo: cada 60 s si el día elegido tiene partidos en juego.
   state.timer = setInterval(async () => {
-    if (document.hidden || state.paused) return; // pestaña oculta o en pausa: no se gasta red ni se repinta
+    if (document.hidden || state.paused || state.soon) return; // pestaña oculta, en pausa o en «Empiezan en»: no se gasta red ni se repinta
     const date = state.date;
     if (!byDate.get(date)?.some(isLive)) return;
     try {
       const fresh = dataOf(await api.get('/api/games', { league: lg.id, date }, { fresh: true }));
       if (state.dead || !fresh?.length) return;
       byDate.set(date, fresh);
-      if (date === state.date) drawList();
+      if (date === state.date && !state.soon) drawList();
     } catch { /* se reintenta en el siguiente ciclo */ }
   }, REFRESH_MS);
 }
@@ -513,7 +585,7 @@ export default {
   async render(el, ctx) {
     ui = ctx.ui;
     const lg = typeof ctx.league === 'string' ? leagueById(ctx.league) : ctx.league;
-    const state = { dead: false, timer: null, date: null, details: new Map(), markets: new Map(), cleanups: [] };
+    const state = { dead: false, timer: null, date: null, draw: 0, details: new Map(), markets: new Map(), cleanups: [] };
     const cleanup = () => {
       state.dead = true;
       clearInterval(state.timer);
