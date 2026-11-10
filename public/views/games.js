@@ -139,7 +139,7 @@ export const refocus = (list, spot) => {
 async function renderList(root, ctx, lg, state) {
   const { api } = ctx;
   const tennis = lg.sport === 'tennis';
-  root.innerHTML = `<header class="gm-header"><h1>Partidos · ${esc(lg.title)}</h1>${tennis ? '<a class="gm-more" href="#/tennis-rankings">Ranking ATP →</a>' : ''}<span class="gm-badges" data-badges></span></header>
+  root.innerHTML = `<header class="gm-header"><h1>Partidos · ${esc(lg.title)}</h1>${lg.id === 'atp' ? '<a class="gm-more" href="#/tennis-rankings">Ranking ATP →</a>' : ''}<span class="gm-badges" data-badges></span></header>
     <nav class="gm-dates" aria-label="Fechas" data-dates></nav>
     <p class="gm-livebar" data-livebar hidden><button type="button" class="btn sm" data-pause aria-pressed="false">Pausar actualización</button></p>
     <div class="gm-list" data-list>${ui.loading()}</div>
@@ -161,7 +161,7 @@ async function renderList(root, ctx, lg, state) {
     return;
   }
 
-  root.querySelector('[data-badges]').innerHTML = ui.sourceBadge('espn') + ui.sourceBadge('oddsy');
+  root.querySelector('[data-badges]').innerHTML = ui.sourceBadge(lg.id === 'challenger' ? 'livescore' : 'espn') + ui.sourceBadge('oddsy');
   const pc = { league: lg.id, store: ctx.store, picks: [], tennis };
   state.cleanups.push(syncPicks(root, pc));
   // Cuotas del modelo por fecha: se piden al elegir el día y quedan en caché.
@@ -327,8 +327,10 @@ async function renderTennisDetail(root, ctx, lg, id, state) {
   const g = mk.data.game;
   const pc = { league: lg.id, store: ctx.store, picks: [], tennis: true };
   state.cleanups.push(syncPicks(root, pc));
-  const player = (t, cls) => `<div class="gm-hteam ${cls}">${ui.teamLogo(t, { size: 40 })}<div><a class="tn-player" href="#/tennis-player/${encodeURIComponent(t.id)}"><b>${esc(t.name)}</b></a>
-      <small>${esc(t.record ? `Ranking ${t.record}` : 'Sin ranking')}</small></div>${g.status?.state !== 'pre' && t.score != null ? `<span class="gm-hscore">${esc(t.score)}</span>` : ''}</div>`;
+  // Ranking y ficha de jugador salen de ESPN: solo en la ATP (el Challenger viene de LiveScore).
+  const atp = lg.id === 'atp';
+  const player = (t, cls) => `<div class="gm-hteam ${cls}">${ui.teamLogo(t, { size: 40 })}<div>${atp ? `<a class="tn-player" href="#/tennis-player/${encodeURIComponent(t.id)}"><b>${esc(t.name)}</b></a>` : `<b>${esc(t.name)}</b>`}
+      ${atp ? `<small>${esc(t.record ? `Ranking ${t.record}` : 'Sin ranking')}</small>` : ''}</div>${g.status?.state !== 'pre' && t.score != null ? `<span class="gm-hscore">${esc(t.score)}</span>` : ''}</div>`;
   const where = [g.tournament, g.round, SURF[g.surface], g.bestOf && `al mejor de ${g.bestOf} sets`].filter(Boolean).join(' · ');
   const markets = mk.accuracy?.publish === false ? `<p class="gm-note">${NO_PUBLISH}.</p>`
     : mk.data.markets.length ? marketTables(g, mk, pc) : ui.empty('Oddsy no tiene cuotas para este partido.');

@@ -1,0 +1,270 @@
+{
+"Stages": [
+{
+"Sid": "26754",
+"Snm": "Brisbane 3",
+"Scd": "brisbane-3",
+"Cnm": "ATP Challenger",
+"Ccd": "atp-challenger",
+"Events": [
+{
+"Eid": "1916573",
+"Tr1": "2",
+"Tr2": "1",
+"Tr1S1": "6",
+"Tr2S1": "3",
+"Tr1S2": "4",
+"Tr2S2": "6",
+"Tr1S3": "7",
+"Tr2S3": "5",
+"T1": [
+{
+"ID": "5534",
+"Nm": "Bernard Tomic",
+"Abr": "BER"
+}
+],
+"T2": [
+{
+"ID": "504",
+"Nm": "Blake Ellis",
+"Abr": "BLA"
+}
+],
+"Eps": "FT",
+"Esid": 6,
+"Ewt": 1,
+"Esd": 20261109035000
+},
+{
+"Eid": "1916574",
+"Tr1": "2",
+"Tr2": "1",
+"Tr1S1": "6",
+"Tr2S1": "7",
+"Tr1S2": "7",
+"Tr2S2": "6",
+"Tr1S3": "6",
+"Tr2S3": "2",
+"Tr1S1T": "3",
+"Tr2S1T": "7",
+"Tr1S2T": "7",
+"Tr2S2T": "4",
+"T1": [
+{
+"ID": "1312",
+"Nm": "Alafia Ayeni",
+"Abr": "ALA"
+}
+],
+"T2": [
+{
+"ID": "648",
+"Nm": "Edward Winter",
+"Abr": "EDW"
+}
+],
+"Eps": "FT",
+"Esid": 6,
+"Ewt": 1,
+"Esd": 20261109044000
+},
+{
+"Eid": "1916903",
+"T1": [
+{
+"ID": "5781",
+"Nm": "Christian Langmo",
+"Abr": "CHR"
+}
+],
+"T2": [
+{
+"ID": "351189",
+"Nm": "Ymerali Ibraimi",
+"Abr": "YME"
+}
+],
+"Eps": "NS",
+"Esid": 1,
+"Esd": 20261110045000
+},
+{
+"Eid": "1916576",
+"T1": [
+{
+"ID": "189810",
+"Nm": "August Holmgren",
+"Abr": "AUG"
+}
+],
+"T2": [
+{
+"ID": "12689",
+"Nm": "Philip Sekulic",
+"Abr": "PHI"
+}
+],
+"Eps": "NS",
+"Esid": 1,
+"Esd": 20261110054500
+},
+{
+"Eid": "9000001",
+"T1": [
+{
+"ID": "189810",
+"Nm": "August Holmgren",
+"Abr": "AUG"
+}
+],
+"T2": [
+{
+"ID": "12689",
+"Nm": "Philip Sekulic",
+"Abr": "PHI"
+}
+],
+"Eps": "S2",
+"Esid": 1,
+"Esd": 20261110054500,
+"Tr1": "1",
+"Tr2": "0",
+"Tr1S1": "6",
+"Tr2S1": "4",
+"Tr1S2": "2",
+"Tr2S2": "1"
+},
+{
+"Eid": "9000002",
+"T1": [
+{
+"ID": "189810",
+"Nm": "August Holmgren",
+"Abr": "AUG"
+}
+],
+"T2": [
+{
+"ID": "12689",
+"Nm": "Philip Sekulic",
+"Abr": "PHI"
+}
+],
+"Eps": "Canc.",
+"Esid": 1,
+"Esd": 20261110054500
+},
+{
+"Eid": "9000003",
+"Tr1": "1",
+"Tr2": "0",
+"Tr1S1": "6",
+"Tr2S1": "3",
+"T1": [
+{
+"ID": "5534",
+"Nm": "Bernard Tomic",
+"Abr": "BER"
+}
+],
+"T2": [
+{
+"ID": "504",
+"Nm": "Blake Ellis",
+"Abr": "BLA"
+}
+],
+"Eps": "Ret.",
+"Esid": 6,
+"Ewt": 1,
+"Esd": 20261109035000
+},
+{
+"Eid": "9000004",
+"T1": [
+{
+"ID": "1",
+"Nm": "A One"
+},
+{
+"ID": "2",
+"Nm": "B Two"
+}
+],
+"T2": [
+{
+"ID": "3",
+"Nm": "C Three"
+},
+{
+"ID": "4",
+"Nm": "D Four"
+}
+],
+"Eps": "NS",
+"Esid": 1,
+"Esd": 20261110045000
+}
+]
+},
+{
+"Sid": "26752",
+"Snm": "Stockholm Open",
+"Scd": "stockholm-open",
+"Cnm": "ATP 250",
+"Ccd": "atp-250",
+"Events": [
+{
+"Eid": "1916834",
+"T1": [
+{
+"ID": "101513",
+"Nm": "Luca Van Assche",
+"Abr": "LUC"
+}
+],
+"T2": [
+{
+"ID": "99627",
+"Nm": "Alexander Shevchenko",
+"Abr": "ALE"
+}
+],
+"Eps": "Canc.",
+"Esid": 56,
+"Esd": 20261110100000
+}
+]
+},
+{
+"Sid": "26742",
+"Snm": "WTA Finals: Group A",
+"Scd": "wta-finals-group-a-2026",
+"Cnm": "WTA Finals",
+"Ccd": "wta-finals",
+"Events": [
+{
+"Eid": "1915553",
+"T1": [
+{
+"ID": "595",
+"Nm": "Elena Rybakina",
+"Abr": "ELE"
+}
+],
+"T2": [
+{
+"ID": "693",
+"Nm": "Coco Gauff",
+"Abr": "COR"
+}
+],
+"Eps": "Canc.",
+"Esid": 56,
+"Esd": 20261110180000
+}
+]
+}
+]
+}

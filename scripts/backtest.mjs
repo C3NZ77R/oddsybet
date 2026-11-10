@@ -16,6 +16,7 @@ import { getPastSeason, thinSeason, uniqueById } from '../lib/espn.mjs';
 import { ratingsFromResults, expected, SPORT_MODEL, SIGMA, SIGMA_T, MU_SHRINK } from '../lib/ratings.mjs';
 import { marketsFor } from '../lib/markets.mjs';
 import { finished, matchProb, eloStep, eloSnapshot } from '../lib/tennis.mjs';
+import { challengerSnapshot } from '../lib/challenger.mjs';
 
 export const LAG = 6 * 3_600_000;
 const DAY = 86_400_000;
@@ -199,11 +200,14 @@ export { eloStep }; // el test comprueba que la pasada incremental deja lo mismo
 
 // Una pasada cronológica: cada partido de la temporada se predice con el Elo de ese momento y después lo actualiza.
 // El Elo de un jugador solo cambia con sus partidos, así que no hay fuga. Los retiros no se miden (eloFrom los ignora).
+// season: el año o un filtro de partidos (Challenger: los de su circuito tras la quema del Elo).
+const yearIs = (season) => (typeof season === 'function' ? season : (m) => new Date(m.date).getUTCFullYear() === season);
 export function predictAtp(matches, season) {
+  const inTest = yearIs(season);
   const elo = new Map();
   const out = [];
   for (const m of finished(matches)) {
-    if (!m.retired && new Date(m.date).getUTCFullYear() === season) {
+    if (!m.retired && inTest(m)) {
       out.push({ id: m.id, a: m.a.id, b: m.b.id, outcome: m.winner === 'a' ? 'H' : 'A', p: matchProb(elo, m.a.id, m.b.id, m.surface) });
     }
     eloStep(elo, m);
@@ -215,8 +219,8 @@ export function predictAtp(matches, season) {
 export const scoreAtp = (preds) => metrics('tennis', preds.map(({ p, outcome }) => ({ outcome, p: { H: p, A: 1 - p } })));
 
 // Referencia: la forma, sin fuga. q = (victorias + 1) / (partidos + 2) de cada jugador en las 52 semanas previas y
-// P(gana A) = logística de c·(logit qa − logit qb), con c el de menor log-loss en la temporada anterior.
-export function formBaseline(matches, season) {
+// P(gana A) = logística de c·(logit qa − logit qb), con c el de menor log-loss en la temporada anterior (o en fit).
+export function formBaseline(matches, season, { test = yearIs(season), fit = yearIs(season - 1) } = {}) {
   const ms = finished(matches).filter((m) => !m.retired);
   const recent = new Map(); // id -> [[t, ganó]]
   const rows = [];
@@ -227,13 +231,13 @@ export function formBaseline(matches, season) {
       recent.set(id, r);
       return (r.filter(([, w]) => w).length + 1) / (r.length + 2);
     };
-    if (y === season || y === season - 1) rows.push({ y, x: Math.log(q(m.a.id) / (1 - q(m.a.id))) - Math.log(q(m.b.id) / (1 - q(m.b.id))), outcome: m.winner === 'a' ? 'H' : 'A' });
+    if (test(m) || fit(m)) rows.push({ y: test(m) ? 'test' : 'fit', x: Math.log(q(m.a.id) / (1 - q(m.a.id))) - Math.log(q(m.b.id) / (1 - q(m.b.id))), outcome: m.winner === 'a' ? 'H' : 'A' });
     for (const [id, w] of [[m.a.id, m.winner === 'a'], [m.b.id, m.winner === 'b']]) (recent.get(id) ?? recent.set(id, []).get(id)).push([t, w]);
   }
   const at = (c, rs) => metrics('tennis', rs.map(({ x, outcome }) => ({ outcome, p: { H: 1 / (1 + Math.exp(-c * x)), A: 1 - 1 / (1 + Math.exp(-c * x)) } })));
-  const fit = rows.filter((r) => r.y === season - 1);
-  const c = Array.from({ length: 31 }, (_, i) => i / 20).reduce((a, b) => (at(b, fit).logloss < at(a, fit).logloss ? b : a));
-  return { c, ...at(c, rows.filter((r) => r.y === season)) };
+  const fitRows = rows.filter((r) => r.y === 'fit');
+  const c = Array.from({ length: 31 }, (_, i) => i / 20).reduce((a, b) => (at(b, fitRows).logloss < at(a, fitRows).logloss ? b : a));
+  return { c, ...at(c, rows.filter((r) => r.y === 'test')) };
 }
 
 const atpMatches = async () => [...eloSnapshot(), ...JSON.parse(await readFile(ATP, 'utf8')).matches];
@@ -246,6 +250,20 @@ async function atpEntry() {
   const out = { season: ATP_SEASON, n: m.n, brier: r4(m.brier), logloss: r4(m.logloss), baseline: { brier: r4(b.brier), logloss: r4(b.logloss) } };
   return { ...out, publish: out.brier < out.baseline.brier,
     note: 'La referencia es la forma: victorias de cada jugador en las 52 semanas previas, convertidas en probabilidad con lo ajustado en la temporada anterior.' };
+}
+
+// Challenger (data/challenger-elo.json, LiveScore desde octubre de 2025): se mide desde CH_TEST, con 7 meses de quema del
+// Elo, solo en partidos del Challenger; la forma ajusta su c en los tres meses previos.
+const CH_TEST = '2026-05-01', CH_FIT = '2026-02-01';
+async function challengerEntry() {
+  const matches = finished(uniqueById(challengerSnapshot()));
+  const ch = (m) => m.level === 'challenger';
+  const test = (m) => ch(m) && m.date >= CH_TEST, fit = (m) => ch(m) && m.date >= CH_FIT && m.date < CH_TEST;
+  const m = scoreAtp(predictAtp(matches, test));
+  const b = formBaseline(matches, null, { test, fit });
+  const out = { season: Number(CH_TEST.slice(0, 4)), from: CH_TEST, n: m.n, brier: r4(m.brier), logloss: r4(m.logloss), baseline: { brier: r4(b.brier), logloss: r4(b.logloss) } };
+  return { ...out, publish: out.brier < out.baseline.brier,
+    note: 'Partidos del Challenger desde mayo de 2026. La referencia es la forma: victorias de cada jugador en las 52 semanas previas.' };
 }
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -265,7 +283,7 @@ async function main(args) {
   const espn = politeFetch(globalThis.fetch, { dir: CACHE });
   globalThis.fetch = espn; // lib/espn.mjs pide con el fetch global
   const runs = [];
-  for (const id of ids.filter((x) => x !== 'atp')) {
+  for (const id of ids.filter((x) => leagueById(x).sport !== 'tennis')) {
     try {
       const { sport } = leagueById(id);
       const [test, prev] = [await getPastSeason(id, 1), await getPastSeason(id, 2)];
@@ -314,6 +332,11 @@ async function main(args) {
       console.error(`atp: ${err.message}`);
       process.exitCode = 1;
     }
+  }
+  if (ids.includes('challenger')) {
+    const a = (fresh.challenger = await challengerEntry());
+    console.log(`challenger desde ${a.from}: ${a.n} partidos, Brier ${a.brier} (referencia ${a.baseline.brier}), log-loss ${a.logloss}`
+      + ` (referencia ${a.baseline.logloss}) → ${a.publish ? 'se publica' : 'NO se publica'}`);
   }
   // Aciertos por deporte con las mitades de prueba de todas sus ligas (más casos por tramo que liga por liga).
   const bins = {};

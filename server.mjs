@@ -24,6 +24,7 @@ const RX = {
   // Fecha real: 20261399 cumple \d{8} y ESPN respondería 502.
   date: { test: (v) => /^(19|20)\d{6}$/.test(v) && new Date(Date.UTC(v.slice(0, 4), v.slice(4, 6) - 1, v.slice(6))).toISOString().slice(0, 10).replaceAll('-', '') === v },
   id: /^\d{1,12}$/,
+  game: /^(ls)?\d{1,12}$/, // ls: partidos del Challenger (LiveScore, lib/challenger.mjs)
   ids: /^\d{1,12}(,\d{1,12}){0,39}$/,
   season: /^(19|20)\d\d$/,
   q: /^[\p{L}\p{M}0-9 .'’-]{2,40}$/u,
@@ -53,7 +54,7 @@ function teamLeague(url) {
 
 const ROUTES = {
   '/api/leagues': async () => ({ source: 'espn', data: LEAGUES }),
-  '/api/markets': async (url) => getMarkets(leagueParam(url), { game: param(url, 'game', RX.id), date: param(url, 'date', RX.date) }),
+  '/api/markets': async (url) => getMarkets(leagueParam(url), { game: param(url, 'game', RX.game), date: param(url, 'date', RX.date) }),
   '/api/picks': async (url) => {
     const league = leagueParam(url), date = param(url, 'date', RX.date);
     return getPicks(league, { date, model: await currentModel() }); // con lo que aprendió el registro de picks
@@ -67,7 +68,7 @@ const ROUTES = {
   '/api/games': async (url) => {
     const lg = leagueParam(url);
     const date = param(url, 'date', RX.date);
-    return { source: 'espn', data: await (isTennis(lg) ? getTennisGames(date) : espn.getGames(lg, date)) };
+    return { source: lg === 'challenger' ? 'livescore' : 'espn', data: await (isTennis(lg) ? getTennisGames(lg, date) : espn.getGames(lg, date)) };
   },
   '/api/game': async (url) => ({ source: 'espn', data: await espn.getGame(teamLeague(url), param(url, 'id', RX.id, true)) }),
   '/api/live': async (url) => ({ source: 'espn', data: await espn.getLive(teamLeague(url)) }),

@@ -180,7 +180,7 @@ export const errorBox = (err) => h`<div class="error-box" role="alert"><b>No se 
 
 export function sourceBadge(source, remaining) {
   if (source && typeof source === 'object') ({ source, remaining } = source);
-  const M = { oddsy: ['Modelo Oddsy', 'Cuotas que calcula Oddsy con datos de ESPN'], espn: ['ESPN', 'Datos públicos de ESPN'] };
+  const M = { oddsy: ['Modelo Oddsy', 'Cuotas que calcula Oddsy con datos de ESPN'], espn: ['ESPN', 'Datos públicos de ESPN'], livescore: ['LiveScore', 'Partidos y resultados públicos de LiveScore'] };
   const [txt, tip] = M[source] ?? ['Fuente desconocida', ''];
   const extra = remaining != null && remaining !== '' ? ` · ${remaining} créditos` : '';
   return h`<span class="src-badge src-${M[source] ? source : 'na'}" title="${tip}">${txt}${extra}</span>`;

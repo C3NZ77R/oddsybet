@@ -25,6 +25,7 @@ test('server: /api/odds y /api/sports ya no existen', async () => {
 test('server: /api/markets valida liga y partido', async () => {
   assert.equal((await call('/api/markets?league=xx')).status, 400);
   assert.equal((await call('/api/markets?league=nba&game=abc')).status, 400);
+  assert.equal((await call('/api/markets?league=challenger&game=lsabc')).status, 400); // ls + dígitos: Challenger
 });
 
 // NBA: summary del partido (event=2 en sede neutral), lista de dos equipos y un calendario por equipo, sin red.

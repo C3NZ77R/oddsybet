@@ -9,6 +9,7 @@ export const LEAGUES = [
   { id: 'libertadores', title: 'Libertadores', sport: 'soccer', espn: 'conmebol.libertadores' },
   { id: 'colombia', title: 'Liga BetPlay', sport: 'soccer', espn: 'col.1' },
   { id: 'atp', title: 'ATP', sport: 'tennis', espn: 'atp' },
+  { id: 'challenger', title: 'Challenger', sport: 'tennis', espn: null }, // de LiveScore (lib/challenger.mjs): ESPN no lo cubre
 ];
 
 export const leagueById = (id) => LEAGUES.find((l) => l.id === id) ?? null;

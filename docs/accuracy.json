@@ -2953,5 +2953,18 @@
         }
       }
     }
+  },
+  "challenger": {
+    "season": 2026,
+    "from": "2026-05-01",
+    "n": 3740,
+    "brier": 0.2369,
+    "logloss": 0.6668,
+    "baseline": {
+      "brier": 0.2443,
+      "logloss": 0.6816
+    },
+    "publish": true,
+    "note": "Partidos del Challenger desde mayo de 2026. La referencia es la forma: victorias de cada jugador en las 52 semanas previas."
   }
 }
