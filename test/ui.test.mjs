@@ -140,6 +140,30 @@ test('ficha de tenis: encabezado con nombre y Elo; marcador, games y % de más d
   }
 });
 
+test('Partidos: la tarjeta pone % y cuota en la fila de cada lado, con fila de empate en fútbol', async () => {
+  const { mainParts } = await import('../public/views/games.js');
+  const { marketsFor } = await import('../lib/markets.mjs');
+  const g = { id: '7', home: { abbr: 'MNC', name: 'Manchester City' }, away: { abbr: 'FUL', name: 'Fulham' } };
+  const markets = marketsFor('soccer', { kind: 'poisson', lh: 2.2, la: 0.6 });
+  const [H, D, A] = markets.find((m) => m.key === '1x2').selections;
+  const ctx = { picks: [], store, league: 'epl' };
+  const o = mainParts(g, { by: new Map([['7', markets]]), accuracy: null }, ctx);
+  assert.ok(o.home.includes(fmtPct(H.p, 0)) && o.home.includes(fmtOdds(H.oddsy)) && o.home.includes('gm-fav1'));
+  assert.ok(o.away.includes(fmtPct(A.p, 0)) && !o.away.includes('gm-fav1'));
+  assert.ok(o.draw.includes('Empate') && o.draw.includes(fmtOdds(D.oddsy)));
+  assert.equal(ctx.picks.length, 3);
+  // Barra de arriba abajo: visitante, empate, local.
+  assert.deepEqual([...o.main.matchAll(/flex-grow:([\d.]+)/g)].map((x) => Number(x[1])), [A, D, H].map((s) => Number((s.p * 100).toFixed(1))));
+  // Ganador de dos lados (tenis): sin empate; sin cuotas, solo el motivo.
+  const ml = { key: 'ml', label: 'Ganador', selections: [{ name: 'MNC', p: 0.6, fair: 1.67, oddsy: 1.6 }, { name: 'FUL', p: 0.4, fair: 2.5, oddsy: 2.4 }] };
+  const t = mainParts(g, { by: new Map([['7', [ml]]]), accuracy: null }, { ...ctx, picks: [], tennis: true });
+  assert.equal(t.draw, '');
+  assert.ok(t.home.includes('60%') && t.away.includes('40%'));
+  const none = mainParts(g, { by: new Map(), accuracy: null }, ctx);
+  assert.match(none.main, /no tiene cuotas/);
+  assert.equal(none.home + none.away + none.draw, '');
+});
+
 test('Partidos: la tabla de mercados muestra probabilidad, Justa y Oddsy de cada selección', async () => {
   const { marketTables } = await import('../public/views/games.js');
   const { marketsFor } = await import('../lib/markets.mjs');
