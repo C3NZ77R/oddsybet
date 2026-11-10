@@ -391,3 +391,31 @@ test('básquet: con la línea en ±0.5 el hándicap es el mismo mercado que el g
     assert.ok(Math.abs(sp.p - ml) < 1e-12, `mu ${mu}: hándicap ${sp.p} contra ganador ${ml}`);
   }
 });
+
+test('mercados: un partido por jugar con la línea de la casa en el scoreboard se cotiza con ella (x.mkt), sin lo aprendido; terminado, sin ella', async () => {
+  const { getPicks } = await import('../lib/markets.mjs');
+  const day = (d) => new Date(Date.UTC(2026, 0, 3 + 7 * d, 19)).toISOString();
+  const ids = ['1', '2', '3', '4'];
+  const events = [];
+  let k = 0;
+  for (const h of ids) for (const a of ids) if (h !== a) events.push(ev(`r${k}`, day(k++), h, a, 1, 1)); // todos iguales: el modelo ve un partido parejo
+  const odds = [{ provider: { name: 'DraftKings' }, moneyline: { home: { close: { odds: '-250' } }, draw: { close: { odds: '+350' } }, away: { close: { odds: '+700' } } },
+    total: { over: { close: { line: 'o2.5', odds: '-120' } }, under: { close: { line: 'u2.5', odds: '+100' } } } }];
+  const g = ev('g', '2026-04-11T19:00:00.000Z', '1', '2', 0, 0, 'pre');
+  g.competitions[0].odds = odds;
+  const done = ev('h', '2026-04-11T17:00:00.000Z', '3', '4', 2, 0);
+  done.competitions[0].odds = odds;
+  await withEspn(leagueRoute('col.1', events, [g, done]), async () => {
+    const { data } = await getMarkets('colombia', { date: '20260411' });
+    const [pre, post] = ['g', 'h'].map((id) => data.find((x) => x.gameId === id));
+    assert.equal(pre.x.mkt, 1);
+    const q = [-250, 350, 700].map((a) => 1 / (a > 0 ? 1 + a / 100 : 1 + 100 / -a));
+    close(sel(pick(pre.markets, '1x2'), 'Local').p, q[0] / (q[0] + q[1] + q[2]), 0.01);
+    assert.equal(post.x.mkt, undefined);
+    assert.ok(sel(pick(post.markets, '1x2'), 'Local').p < 0.5, 'el terminado va con el modelo (parejo)');
+    // Lo aprendido no toca al cotizado con la línea.
+    const shift = { sports: { soccer: { status: 'en_uso', leagues: { colombia: 1 } } } };
+    const [a, b] = await Promise.all([getPicks('colombia', { date: '20260411' }), getPicks('colombia', { date: '20260411', model: shift })]);
+    assert.deepEqual(a.data.find((x) => x.gameId === 'g').picks, b.data.find((x) => x.gameId === 'g').picks);
+  });
+});

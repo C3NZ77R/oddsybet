@@ -170,6 +170,7 @@ footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px
 /* Mejores apuestas */
 .pk-game + .pk-game { margin-top: 12px; }
 .pk-game h2 { font-size: 16px; margin: 0 0 4px; }
+.pk-why { margin: -10px 0 12px; padding-left: 10px; border-left: 2px solid var(--teal); font-size: 14px; }
 /* En el celular la tabla cabe en la tarjeta: el texto se parte en líneas en vez de empujar la página de lado. */
 .pk-game .tbl th, .pk-game .tbl td, .pk-record .tbl th, .pk-record .tbl td { white-space: normal; }
 .pk-game .tbl td small { display: block; }

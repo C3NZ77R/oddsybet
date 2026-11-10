@@ -16,10 +16,22 @@ const LATE = Symbol('tarde');
 const recordText = (r) => (r ? h`${fmtPct(r.hit, 0)} <small>de ${r.n}</small>` : "—");
 const star = (p) => (p.featured ? h`<span class="pk-star" aria-label="Pick del partido">★</span> ` : '');
 
-function gameCard(g, picks) {
+// El porqué del pick del partido cotizado con la línea del mercado (x.mkt): qué decía el modelo solo y hacia dónde se
+// movió la línea desde que abrió, en probabilidad (Oddsy no muestra precios ajenos). Diferencias de menos de 3 puntos
+// no se cuentan.
+export function whyText(p, x) {
+  if (!x?.mkt || !p) return '';
+  const parts = [];
+  if (p.pModel != null) parts.push(Math.abs(p.raw - p.pModel) < 0.03 ? `el modelo de Oddsy coincide (${fmtPct(p.pModel, 0)})` : `el modelo de Oddsy solo daba ${fmtPct(p.pModel, 0)}`);
+  if (p.pOpen != null && Math.abs(p.raw - p.pOpen) >= 0.03) parts.push(`abrió en ${fmtPct(p.pOpen, 0)} y se movió ${p.raw > p.pOpen ? 'a favor' : 'en contra'}`);
+  return parts.length ? `Con la línea del mercado: ${parts.join(' y ')}.` : 'Con la línea del mercado.';
+}
+
+function gameCard(g, picks, x) {
+  const why = whyText(picks.find((p) => p.featured) ?? picks[0], x);
   return h`<section class="card pk-game">
     <h2>${g.home?.name} vs ${g.away?.name}</h2>
-    <p class="hint">${when(g.start)}</p>
+    <p class="hint">${when(g.start)}</p>${why ? h`<p class="pk-why">${why}</p>` : ''}
     <table class="tbl"><caption class="sr-only">Mejores apuestas de ${g.home?.name} contra ${g.away?.name}</caption>
       <thead><tr><th scope="col">Apuesta</th><th scope="col">Probabilidad</th><th scope="col">Cuota mínima</th><th scope="col">Se cumplió</th></tr></thead>
       <tbody>${picks.map((p) => h`<tr><td>${star(p)}${pickText(p, g)}</td><td>${fmtPct(p.p, 0)}</td><td><b>${fmtOdds(p.minOdds)}</b></td><td>${recordText(p.record)}</td></tr>`)}</tbody>
@@ -92,12 +104,12 @@ export default {
     const games = new Map(res.flatMap(([gs]) => gs.data ?? []).map((g) => [g.id, g]));
     const acc = res.map(([, pk]) => pk.accuracy).find(Boolean); // la del primer día que respondió
     // Llegan también los picks que lo aprendido dejó bajo el 50 % (el registro los guarda); aquí no se muestran.
-    const rows = res.flatMap(([, pk]) => pk.data ?? []).map((x) => [games.get(x.gameId), x.picks.filter((p) => p.p >= 0.5)])
+    const rows = res.flatMap(([, pk]) => pk.data ?? []).map((x) => [games.get(x.gameId), x.picks.filter((p) => p.p >= 0.5), x.x])
       .filter(([g, ps]) => g?.status?.state === 'pre' && ps.length).sort(([a], [b]) => a.start.localeCompare(b.start));
     el.innerHTML = h`<div data-record>${recordHtml(record)}</div><header class="view-head"><div><h1>Mejores apuestas · ${lg.title}</h1>
-      <p class="hint">Apuesta solo si tu casa paga <b>la cuota mínima o más</b>.</p></div></header>
+      <p class="hint">Apuesta solo si tu casa paga <b>la cuota mínima o más</b>. Donde hay línea del mercado, la probabilidad parte de ella: en el backtest acierta más que el modelo solo.</p></div></header>
       ${acc?.publish === false ? empty('Aún no mostramos apuestas en esta liga: Oddsy todavía no supera a los resultados de la temporada pasada.')
-        : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps]) => gameCard(g, ps))}` : empty('No hay partidos próximos con apuestas de al menos 50%.')}`;
+        : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps, x]) => gameCard(g, ps, x))}` : empty('No hay partidos próximos con apuestas de al menos 50%.')}`;
     el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, 8, record, `${location.origin}${location.pathname}#/${lg.id}/picks`))}`, '_blank', 'noopener'));
     // Si se cambió de vista mientras tanto, el hueco ya no está en la página y no se toca nada.
     if (first === LATE) recordP.then((rec) => {

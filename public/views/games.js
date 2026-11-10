@@ -305,7 +305,8 @@ export function marketTables(d, mk, ctx, trends = {}) {
   const row = (m, s, top) => `<tr${s === top ? ' class="gm-top1"' : ''}><th scope="row">${esc(selName(d, s))}${s.line != null ? ` <span class="gm-line">${esc(lineTxt(m, s))}</span>` : ''}${s === top ? ' <small class="gm-tag">Más probable</small>' : ''}</th>
     <td><span class="gm-pc"><span class="gm-pbar" aria-hidden="true"><i style="width:${(s.p * 100).toFixed(1)}%"></i></span>${esc(ui.fmtPct(s.p))}</span></td><td>${esc(ui.fmtOdds(s.fair))}</td><td>${selBtn(d, m, s, ctx, true)}</td></tr>`;
   const seen = new Set(), main = mainTotal(mk.data.markets);
-  return `<p class="gm-src">${ui.sourceBadge('oddsy')}</p>`
+  // x.mkt: cotizado con la línea del mercado (lib/book.mjs); la línea misma no se muestra.
+  return `<p class="gm-src">${ui.sourceBadge('oddsy')}${mk.data.x?.mkt ? ' Con la línea del mercado, que en el backtest acierta más que el modelo solo.' : ''}</p>`
     + mk.data.markets.map((m, i) => {
       // La tendencia del total va en la línea principal (fútbol tiene 0.5 a 5.5), no en la primera.
       const t = !seen.has(m.key) && (m.key !== 'ou' || m.selections[0].line === main) && trends[m.key];

@@ -156,6 +156,8 @@ test('Partidos: la tabla de mercados muestra probabilidad, Justa y Oddsy de cada
   assert.equal(html.match(/Más probable/g).length, markets.length);
   assert.equal(ctx.picks.length, markets.flatMap((m) => m.selections).length);
   assert.ok(ctx.picks.every((p) => p.book === 'oddsy'));
+  assert.doesNotMatch(html, /línea del mercado/);
+  assert.match(marketTables(d, { data: { markets, x: { mkt: 1 } }, accuracy: null }, { ...ctx, picks: [] }), /Con la línea del mercado/);
 });
 
 test('Mejores apuestas: si falla un día se muestran los otros; si falla todo, error', async () => {
@@ -342,4 +344,17 @@ test('Partidos: al repintar, el foco vuelve al mismo control de la misma tarjeta
   assert.equal(focused, '2-pick');
   assert.equal(focusSpot(list(before), { closest: () => null }), null); // foco fuera de la lista
   refocus(list(after), null); // sin foco previo no hace nada
+});
+
+test('Mejores apuestas: el porqué del pick cotizado con la línea del mercado, sin precios ajenos', async () => {
+  const { whyText } = await import('../public/views/picks.js');
+  assert.equal(whyText({ raw: 0.7 }, {}), ''); // sin línea, el modelo solo: nada que explicar
+  const same = whyText({ raw: 0.7, pModel: 0.69, pOpen: 0.69 }, { mkt: 1 });
+  assert.match(same, /coincide \(69\s?%\)/);
+  assert.doesNotMatch(same, /se movió/);
+  assert.equal(whyText({ raw: 0.7 }, { mkt: 1 }), 'Con la línea del mercado.');
+  const moved = whyText({ raw: 0.7, pModel: 0.55, pOpen: 0.62 }, { mkt: 1 });
+  assert.match(moved, /solo daba 55\s?%/);
+  assert.match(moved, /abrió en 62\s?% y se movió a favor/);
+  assert.match(whyText({ raw: 0.6, pOpen: 0.7 }, { mkt: 1 }), /en contra/);
 });
