@@ -4,13 +4,7 @@
 import { h, fmtPct, fmtOdds, when, empty, ymd } from '../ui.js';
 import { RG_LINE } from '../shell.js';
 
-// "Local o visitante" → "Millonarios o Nacional" (en minúscula o mayúscula); el tenis ya trae los nombres de los jugadores.
-const named = (text, g) => String(text).replace(/\blocal\b/gi, g.home?.name ?? 'Local').replace(/\bvisitante\b/gi, g.away?.name ?? 'Visitante');
-const signed = (x) => (x > 0 ? `+${x}` : `${x}`);
-const HCP = { spread: 'hándicap', games_hcp: 'hándicap de games' };
-const pickText = (p, g) => named(HCP[p.market] ? `${p.name} ${signed(p.line)} (${HCP[p.market]})`
-  : p.market === '1x2' || p.market === 'ml' ? (p.name === 'Empate' ? 'Empate' : `Gana ${p.name}`)
-    : `${p.label}: ${p.name}`, g);
+import { pickText } from '../picktext.js';
 const RECORD_WAIT_MS = 1500;
 const LATE = Symbol('tarde');
 const recordText = (r) => (r ? h`${fmtPct(r.hit, 0)} <small>de ${r.n}</small>` : "—");
