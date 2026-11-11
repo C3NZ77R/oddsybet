@@ -83,6 +83,14 @@ test('una herramienta desconocida responde con error y no tumba el chat', async 
   };
   const r = await chat({ messages: [{ role: 'user', text: 'x' }] }, { key: 'K', fetch, tools: {} });
   assert.equal(r.reply, 'ok');
+  bodies.length = 0;
+  const fetch2 = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return bodies.length === 1
+      ? { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ functionCall: { name: 'toString', args: {} } }] } }] }) }
+      : ok('ok')();
+  };
+  assert.equal((await chat({ messages: [{ role: 'user', text: 'x' }] }, { key: 'K', fetch: fetch2, tools: {} })).reply, 'ok'); // nombre heredado de Object.prototype
   assert.match(bodies[1].contents.at(-1).parts[0].functionResponse.response.error, /herramienta/i);
 });
 

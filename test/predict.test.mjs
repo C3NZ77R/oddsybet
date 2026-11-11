@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { findPicks, filterPicks, normName, verdictOf, oddsNote } from '../lib/predict.mjs';
 
 const game = (id, home, away, state = 'pre') => ({ id, start: '2026-11-11T20:00:00Z', status: { state }, home: { name: home }, away: { name: away } });
-const pick = (p, extra = {}) => ({ market: '1x2', label: '1X2', name: 'Local', line: null, side: 0, raw: p, p, fair: +(1 / p).toFixed(2), minOdds: Math.ceil(Math.round(10500 / p) / 100) / 100, record: { hit: 0.8, n: 40 }, ...extra });
+const pick = (p, extra = {}) => ({ market: '1x2', label: '1X2', name: 'Local', line: null, side: 0, raw: p, p: p + 0.0011, fair: +(1 / p).toFixed(2), minOdds: Math.ceil(Math.round(10500 / p) / 100) / 100, record: { hit: 0.8, n: 40 }, ...extra });
 const picksOf = async (league) => ({ data: league === 'colombia'
   ? [{ gameId: 'c1', x: {}, picks: [pick(0.82, { featured: true }), pick(0.55, { market: 'ou', label: 'Total de goles 2.5', name: 'Más', line: 2.5 })] }, { gameId: 'c2', x: {}, picks: [pick(0.9)] }]
   : [] });
@@ -69,4 +69,19 @@ test('findPicks con sport consulta solo las ligas de ese deporte', async () => {
   const spy = async (league) => (asked.push(league), picksOf(league));
   await findPicks({ sport: 'tennis' }, { picksOf: spy, gamesOf });
   assert.deepEqual(asked, ['atp', 'challenger']);
+});
+
+test('findPicks descarta la liga que no responde a tiempo y redondea p a 2 decimales', async () => {
+  const slow = async (league) => (league === 'nba' ? new Promise(() => {}) : picksOf(league));
+  const r = await findPicks({}, { picksOf: slow, gamesOf, timeoutMs: 20 });
+  assert.ok(!r.leagues.includes('nba'));
+  assert.equal(r.picks[0].p, 0.82);
+});
+
+test('sin picks que lleguen a minP, findPicks devuelve las más altas marcadas belowMinP', async () => {
+  const r = await findPicks({ league: 'colombia', minP: 0.95 }, { picksOf, gamesOf });
+  assert.equal(r.belowMinP, true);
+  assert.equal(r.picks.length, 1);
+  assert.equal((await findPicks({ league: 'colombia', minP: 0.8 }, { picksOf, gamesOf })).belowMinP, false);
+  assert.equal((await findPicks({ league: 'epl', minP: 0.8 }, { picksOf, gamesOf })).belowMinP, false);
 });
