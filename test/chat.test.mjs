@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chat, parseBody, rateOk } from '../lib/chat.mjs';
+import { chat, parseBody, rateOk, SYSTEM } from '../lib/chat.mjs';
 
 const ok = (text) => async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }) });
 
@@ -84,4 +84,10 @@ test('una herramienta desconocida responde con error y no tumba el chat', async 
   const r = await chat({ messages: [{ role: 'user', text: 'x' }] }, { key: 'K', fetch, tools: {} });
   assert.equal(r.reply, 'ok');
   assert.match(bodies[1].contents.at(-1).parts[0].functionResponse.response.error, /herramienta/i);
+});
+
+test('el prompt fija el umbral de segura y la regla de la cuota justa', () => {
+  assert.match(SYSTEM, /segura \(>= 80 %\)/);
+  assert.match(SYSTEM, /cuota justa ronda fair/);
+  assert.match(SYSTEM, /nunca inventes partidos/);
 });

@@ -15,14 +15,14 @@ export function initChat() {
   const log = el('div', 'chat-log'); log.setAttribute('role', 'log'); log.setAttribute('aria-live', 'polite');
 
   const free = el('form', 'chat-free');
-  const input = el('input'); input.placeholder = 'Escribe tu pregunta o tu línea…'; input.maxLength = 1000; input.setAttribute('aria-label', 'Mensaje');
+  const input = el('input'); input.placeholder = 'Pide un pick o pregunta por una línea…'; input.maxLength = 1000; input.setAttribute('aria-label', 'Mensaje');
   const send = el('button', 'btn', 'Enviar'); send.type = 'submit';
   free.append(input, send);
   panel.append(head, log, free);
   document.body.append(panel, fab);
 
   const draw = () => {
-    log.replaceChildren(...(msgs.length ? msgs : [{ role: 'model', text: 'Hola, soy el asistente de Oddsy. Escríbeme, por ejemplo: «Curry más de 3.5 triples en mi casa» y reviso sus partidos para decirte si es confiable.' }])
+    log.replaceChildren(...(msgs.length ? msgs : [{ role: 'model', text: 'Hola, soy el asistente de Oddsy. Pídeme, por ejemplo: «algo seguro para hoy, más del 80 %» o «Curry más de 3.5 triples» y te respondo con los datos del modelo.' }])
       .map((m) => el('div', `chat-msg ${m.role}`, m.text)));
     log.scrollTop = log.scrollHeight;
   };
