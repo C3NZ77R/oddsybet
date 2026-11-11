@@ -171,7 +171,7 @@ export async function handler(req, res) {
       let raw = '';
       req.setEncoding('utf8'); // sin esto, un carácter multibyte partido entre trozos se corrompe
       for await (const c of req) if ((raw += c).length > 20_000) throw espn.httpError(413, 'Mensaje muy largo');
-      json(res, 200, await chat(parseBody(raw), { key: process.env.GEMINI_API_KEY }));
+      json(res, 200, await chat(parseBody(raw), { key: process.env.GEMINI_API_KEY, learned: await currentModel() }));
       return;
     }
     if (url.pathname.startsWith('/api/')) {

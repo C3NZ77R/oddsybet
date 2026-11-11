@@ -49,9 +49,39 @@ test('Gemini interpreta el mensaje, llama a check_line y responde con esos datos
       : ok('Confiable')();
   };
   let got;
-  const r = await chat({ messages: [{ role: 'user', text: 'curry mas de 3.5 triples' }] }, { key: 'K', fetch, run: async (a) => (got = a, { last5: { pct: 80 } }) });
+  const r = await chat({ messages: [{ role: 'user', text: 'curry mas de 3.5 triples' }] }, { key: 'K', fetch, tools: { check_line: async (a) => (got = a, { last5: { pct: 80 } }) } });
   assert.equal(r.reply, 'Confiable');
   assert.deepEqual([got.player, got.stat, got.line, got.side], ['Stephen Curry', '3pm', 3.5, 'Over']);
   const fr = bodies[1].contents.at(-1).parts[0].functionResponse;
   assert.equal(fr.response.last5.pct, 80);
+});
+
+test('Gemini pide find_picks con el umbral del usuario y responde con esos picks', async () => {
+  const bodies = [];
+  const fetch = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return bodies.length === 1
+      ? { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ functionCall: { name: 'find_picks', args: { minP: 0.8, day: 'hoy' } } }] } }] }) }
+      : ok('✅ Gana Nacional')();
+  };
+  let got;
+  const tools = { find_picks: async (a) => (got = a, { day: '2026-11-11', leagues: ['colombia'], picks: [{ game: 'Nacional vs Millonarios', pick: 'Gana Nacional', p: 0.82, minOdds: 1.29, fair: 1.22 }] }) };
+  const r = await chat({ messages: [{ role: 'user', text: 'algo seguro, más del 80% y cuota 1.70' }] }, { key: 'K', fetch, tools });
+  assert.equal(r.reply, '✅ Gana Nacional');
+  assert.deepEqual([got.minP, got.day, got.team], [0.8, 'hoy', '']);
+  assert.equal(bodies[1].contents.at(-1).parts[0].functionResponse.response.picks[0].fair, 1.22);
+  assert.ok(bodies[0].tools[0].functionDeclarations.some((d) => d.name === 'find_picks'));
+});
+
+test('una herramienta desconocida responde con error y no tumba el chat', async () => {
+  const bodies = [];
+  const fetch = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return bodies.length === 1
+      ? { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ functionCall: { name: 'nope', args: {} } }] } }] }) }
+      : ok('ok')();
+  };
+  const r = await chat({ messages: [{ role: 'user', text: 'x' }] }, { key: 'K', fetch, tools: {} });
+  assert.equal(r.reply, 'ok');
+  assert.match(bodies[1].contents.at(-1).parts[0].functionResponse.response.error, /herramienta/i);
 });
