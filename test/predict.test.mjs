@@ -63,3 +63,10 @@ test('verdictOf y oddsNote: umbrales fijos y aviso cuando la cuota pedida supera
   const r = findPicks({ league: 'colombia', odds: 1.7 }, { picksOf, gamesOf });
   return r.then((x) => assert.match(x.note, /cuota justa ronda 1.22/));
 });
+
+test('findPicks con sport consulta solo las ligas de ese deporte', async () => {
+  const asked = [];
+  const spy = async (league) => (asked.push(league), picksOf(league));
+  await findPicks({ sport: 'tennis' }, { picksOf: spy, gamesOf });
+  assert.deepEqual(asked, ['atp', 'challenger']);
+});
