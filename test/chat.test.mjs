@@ -61,14 +61,14 @@ test('Gemini pide find_picks con el umbral del usuario y responde con esos picks
   const fetch = async (url, init) => {
     bodies.push(JSON.parse(init.body));
     return bodies.length === 1
-      ? { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ functionCall: { name: 'find_picks', args: { minP: 0.8, day: 'hoy' } } }] } }] }) }
+      ? { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ functionCall: { name: 'find_picks', args: { minP: 0.8, day: 'hoy', odds: '1.70' } } }] } }] }) }
       : ok('✅ Gana Nacional')();
   };
   let got;
   const tools = { find_picks: async (a) => (got = a, { day: '2026-11-11', leagues: ['colombia'], picks: [{ game: 'Nacional vs Millonarios', pick: 'Gana Nacional', p: 0.82, minOdds: 1.29, fair: 1.22 }] }) };
   const r = await chat({ messages: [{ role: 'user', text: 'algo seguro, más del 80% y cuota 1.70' }] }, { key: 'K', fetch, tools });
   assert.equal(r.reply, '✅ Gana Nacional');
-  assert.deepEqual([got.minP, got.day, got.team], [0.8, 'hoy', '']);
+  assert.deepEqual([got.minP, got.day, got.team, got.odds], [0.8, 'hoy', '', 1.7]);
   assert.equal(bodies[1].contents.at(-1).parts[0].functionResponse.response.picks[0].fair, 1.22);
   assert.ok(bodies[0].tools[0].functionDeclarations.some((d) => d.name === 'find_picks'));
 });
@@ -89,5 +89,6 @@ test('una herramienta desconocida responde con error y no tumba el chat', async 
 test('el prompt fija el umbral de segura y la regla de la cuota justa', () => {
   assert.match(SYSTEM, /segura \(>= 80 %\)/);
   assert.match(SYSTEM, /cuota justa ronda fair/);
+  assert.match(SYSTEM, /copia el campo verdict/);
   assert.match(SYSTEM, /nunca inventes partidos/);
 });

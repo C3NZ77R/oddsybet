@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { findPicks, filterPicks, normName } from '../lib/predict.mjs';
+import { findPicks, filterPicks, normName, verdictOf, oddsNote } from '../lib/predict.mjs';
 
 const game = (id, home, away, state = 'pre') => ({ id, start: '2026-11-11T20:00:00Z', status: { state }, home: { name: home }, away: { name: away } });
 const pick = (p, extra = {}) => ({ market: '1x2', label: '1X2', name: 'Local', line: null, side: 0, raw: p, p, fair: +(1 / p).toFixed(2), minOdds: Math.ceil(Math.round(10500 / p) / 100) / 100, record: { hit: 0.8, n: 40 }, ...extra });
@@ -12,17 +12,20 @@ const gamesOf = async (league) => (league === 'colombia' ? [game('c1', 'Atlétic
 test('findPicks une nombres, texto del pick y ordena por probabilidad', async () => {
   const r = await findPicks({ league: 'colombia' }, { picksOf, gamesOf });
   assert.deepEqual(r.leagues, ['colombia']);
-  assert.equal(r.picks.length, 2); // c2 ya empezó: fuera
+  assert.equal(r.picks.length, 1); // c2 ya empezó: fuera; de c1 solo el pick más probable
   assert.equal(r.picks[0].game, 'Atlético Nacional vs Millonarios');
+  assert.equal(r.picks[0].verdict, 'segura');
   assert.equal(r.picks[0].pick, 'Gana Atlético Nacional');
   assert.deepEqual([r.picks[0].p, r.picks[0].minOdds, r.picks[0].fair, r.picks[0].record.n], [0.82, 1.29, 1.22, 40]);
-  assert.equal(r.picks[1].pick, 'Total de goles 2.5: Más'); // la etiqueta del mercado ya trae la línea
+  const ou = await findPicks({ league: 'colombia', market: 'ou' }, { picksOf, gamesOf });
+  assert.equal(ou.picks[0].pick, 'Total de goles 2.5: Más'); // la etiqueta del mercado ya trae la línea
+  assert.equal(ou.picks[0].verdict, 'arriesgada');
 });
 
 test('findPicks filtra por probabilidad (acepta 80 o 0.8), equipo sin tildes y mercado', async () => {
   assert.equal((await findPicks({ league: 'colombia', minP: 80 }, { picksOf, gamesOf })).picks.length, 1);
   assert.equal((await findPicks({ league: 'colombia', minP: 0.8 }, { picksOf, gamesOf })).picks.length, 1);
-  assert.equal((await findPicks({ league: 'colombia', team: 'nacional' }, { picksOf, gamesOf })).picks.length, 2);
+  assert.equal((await findPicks({ league: 'colombia', team: 'nacional' }, { picksOf, gamesOf })).picks.length, 1);
   assert.equal((await findPicks({ league: 'colombia', team: 'Millos' }, { picksOf, gamesOf })).picks.length, 0);
   assert.equal((await findPicks({ league: 'colombia', market: 'ou' }, { picksOf, gamesOf })).picks[0].market, 'ou');
 });
@@ -32,7 +35,7 @@ test('findPicks consulta todas las ligas, ignora la que falla y devuelve vacío 
   const r = await findPicks({}, { picksOf: failing, gamesOf });
   assert.ok(!r.leagues.includes('nba'));
   assert.ok(r.leagues.includes('colombia'));
-  assert.equal(r.picks.length, 2);
+  assert.equal(r.picks.length, 1);
   assert.equal(r.day.length, 10);
   assert.deepEqual((await findPicks({ league: 'epl' }, { picksOf, gamesOf })).picks, []);
 });
@@ -50,4 +53,13 @@ test('findPicks recorta a MAX_PICKS y pasa el día y el modelo', async () => {
 test('normName y filterPicks son puros', () => {
   assert.equal(normName('  Atlético  NACIONAL '), 'atletico nacional');
   assert.equal(filterPicks([{ p: 0.5, game: 'A vs B', market: 'ou' }], { minP: 0.6 }).length, 0);
+});
+
+test('verdictOf y oddsNote: umbrales fijos y aviso cuando la cuota pedida supera la justa', () => {
+  assert.deepEqual([verdictOf(0.8), verdictOf(0.79), verdictOf(0.6), verdictOf(0.59)], ['segura', 'posible', 'posible', 'arriesgada']);
+  assert.equal(oddsNote([{ p: 0.82, fair: 1.22 }], 1.7), 'Ningún pick llega a la cuota 1.70 con su probabilidad: a 82 % la cuota justa ronda 1.22. Una casa rara vez paga más que la justa.');
+  assert.equal(oddsNote([{ p: 0.82, fair: 1.22 }], 1.2), '');
+  assert.equal(oddsNote([], 1.7), '');
+  const r = findPicks({ league: 'colombia', odds: 1.7 }, { picksOf, gamesOf });
+  return r.then((x) => assert.match(x.note, /cuota justa ronda 1.22/));
 });
