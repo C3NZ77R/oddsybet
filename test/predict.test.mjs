@@ -85,3 +85,13 @@ test('sin picks que lleguen a minP, findPicks devuelve las más altas marcadas b
   assert.equal((await findPicks({ league: 'colombia', minP: 0.8 }, { picksOf, gamesOf })).belowMinP, false);
   assert.equal((await findPicks({ league: 'epl', minP: 0.8 }, { picksOf, gamesOf })).belowMinP, false);
 });
+
+test('findPicks pasa la lectura de Betano, devuelve cuota y ventaja cuando existen y nunca recomienda un pick suspect', async () => {
+  let seen;
+  const withBook = async (league, opts) => { seen = opts; return { data: [{ gameId: 'c1', x: {}, picks: [pick(0.9, { betano: 5, edge: 3.5, value: true, suspect: true }), pick(0.7, { market: 'ou', label: 'Total de goles 2.5', name: 'Más', line: 2.5, betano: 1.3, edge: -0.0887, value: false })] }] }; };
+  const r = await findPicks({ league: 'colombia' }, { picksOf: withBook, gamesOf, book: { games: [] } });
+  assert.deepEqual(seen.book, { games: [] });
+  assert.deepEqual(r.picks.map((p) => [p.market, p.betano, p.edge, p.value]), [['ou', 1.3, -0.09, false]]);
+  const plain = (await findPicks({ league: 'colombia' }, { picksOf, gamesOf })).picks[0];
+  assert.ok(!('betano' in plain) && !('edge' in plain) && !('value' in plain));
+});

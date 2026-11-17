@@ -396,18 +396,28 @@ function linesHtml(d, mk, ctx) {
 // Mercados del modelo como desplegables: el título muestra la opción más probable, dentro va qué se apuesta,
 // una barra por probabilidad y la cuota. trends = HTML de tendencia por clave de mercado (solo en el primero de cada tipo).
 export function marketTables(d, mk, ctx, trends = {}) {
-  // Cuotas de Betano que trajo el marcador (public/betano.js): columna extra con la ventaja si la probabilidad de Oddsy es la real.
-  const bt = B.gameFor(B.saved(ctx.store), d);
+  // Cuotas de Betano: primero las que leyó el servidor (s.betano, s.edge; mk.data.betano = { at, fresh } | null) y, si no
+  // vienen, las que trajo el marcador (public/betano.js). Columna extra con la ventaja si la probabilidad de Oddsy es la real.
+  const saved = B.saved(ctx.store), bt = B.gameFor(saved, d), read = mk.data.betano;
+  const col = Boolean(bt) || mk.data.markets.some((m) => m.selections.some((s) => s.betano != null));
   const btCell = (m, s) => {
-    const price = B.priceFor(bt, m, s), e = B.edge(s.p, price);
-    return e == null ? '<td class="pp-na">—</td>' : `<td>${esc(ui.fmtOdds(price))} <small class="${e > 0 ? 'pos' : 'pp-na'}">${e > 0 ? '+' : ''}${Math.round(e * 100)} %</small></td>`;
+    const price = s.betano ?? B.priceFor(bt, m, s), e = s.betano != null && s.edge != null ? s.edge : B.edge(s.p, price);
+    if (e == null) return '<td class="pp-na">—</td>';
+    // suspect: ventaja de más de 25 %, casi siempre un mal emparejamiento; se muestra la cuota sin prometer la ventaja.
+    return `<td>${esc(ui.fmtOdds(price))} <small class="${!s.suspect && e > 0 ? 'pos' : 'pp-na'}">${s.suspect ? 'por verificar' : `${e > 0 ? '+' : ''}${Math.round(e * 100)} %`}</small></td>`;
   };
-  const head = `<thead><tr><th scope="col">Opción</th><th scope="col">Probabilidad</th><th scope="col">Justa</th><th scope="col">Oddsy</th>${bt ? '<th scope="col">Betano</th>' : ''}</tr></thead>`;
+  const agoOf = (at) => ui.ago(new Date(at).toISOString());
+  // Qué tan confirmadas están las líneas: lectura fresca del servidor, cuotas del marcador, lectura vieja o ninguna.
+  const note = read?.fresh ? `<p class="gm-src" data-betano="ok">Líneas confirmadas en Betano ${esc(agoOf(read.at))}</p>`
+    : bt ? `<p class="gm-src" data-betano="marcador">Cuotas de Betano de tu marcador, de ${esc(agoOf(saved.at))}</p>`
+    : read ? `<p class="gm-note" data-betano="vieja">Lectura de Betano de ${esc(agoOf(read.at))}: líneas estimadas</p>`
+    : '<p class="gm-note" data-betano="no">Líneas estimadas: sin lectura de Betano</p>';
+  const head = `<thead><tr><th scope="col">Opción</th><th scope="col">Probabilidad</th><th scope="col">Justa</th><th scope="col">Oddsy</th>${col ? '<th scope="col">Betano</th>' : ''}</tr></thead>`;
   const row = (m, s, top) => `<tr${s === top ? ' class="gm-top1"' : ''}><th scope="row">${esc(selName(d, s))}${s.line != null ? ` <span class="gm-line">${esc(lineTxt(m, s))}</span>` : ''}${s === top ? ' <small class="gm-tag">Más probable</small>' : ''}</th>
-    <td><span class="gm-pc"><span class="gm-pbar" aria-hidden="true"><i style="width:${(s.p * 100).toFixed(1)}%"></i></span>${esc(ui.fmtPct(s.p))}</span></td><td>${esc(ui.fmtOdds(s.fair))}</td><td>${selBtn(d, m, s, ctx)}</td>${bt ? btCell(m, s) : ''}</tr>`;
+    <td><span class="gm-pc"><span class="gm-pbar" aria-hidden="true"><i style="width:${(s.p * 100).toFixed(1)}%"></i></span>${esc(ui.fmtPct(s.p))}</span></td><td>${esc(ui.fmtOdds(s.fair))}</td><td>${selBtn(d, m, s, ctx)}</td>${col ? btCell(m, s) : ''}</tr>`;
   const seen = new Set(), main = mainTotal(mk.data.markets);
   // x.mkt: cotizado con la línea del mercado (lib/book.mjs); la línea misma no se muestra.
-  return `<p class="gm-src">${ui.sourceBadge('oddsy')}${mk.data.x?.mkt ? ' Con la línea del mercado, que en el backtest acierta más que el modelo solo.' : ''}</p>`
+  return `${note}<p class="gm-src">${ui.sourceBadge('oddsy')}${mk.data.x?.mkt ? ' Con la línea del mercado, que en el backtest acierta más que el modelo solo.' : ''}</p>`
     + mk.data.markets.map((m, i) => {
       // La tendencia del total va en la línea principal (fútbol tiene 0.5 a 5.5), no en la primera.
       const t = !seen.has(m.key) && (m.key !== 'ou' || m.selections[0].line === main) && trends[m.key];

@@ -412,3 +412,48 @@ test('Partidos «Empiezan en»: solo los que no empezaron y arrancan dentro de l
   assert.deepEqual(ids(12), ['nba:b', 'wnba:b', 'nba:a']);
   assert.deepEqual(ids(24), ['nba:b', 'wnba:b', 'nba:a', 'nba:e']);
 });
+
+test('Partidos: el aviso de Betano dice si las líneas están confirmadas, son de una lectura vieja o estimadas', async () => {
+  const { marketTables } = await import('../public/views/games.js');
+  const { marketsFor } = await import('../lib/markets.mjs');
+  const markets = marketsFor('basketball', { kind: 'normal', mu: 3, sigma: 14, total: 220, sigmaT: 19.4 });
+  const d = { id: '1', home: { abbr: 'DET', name: 'Pistons' }, away: { abbr: 'BOS', name: 'Celtics' } };
+  const noStore = { get: () => null, hasPick: () => false }; // sin cuotas del marcador
+  const render = (data) => marketTables(d, { data: { markets, ...data }, accuracy: null }, { picks: [], store: noStore, league: 'nba' });
+  const at = Date.now() - 20 * 60000;
+  assert.match(render({ betano: { at, fresh: true } }), /Líneas confirmadas en Betano hace 20 minutos/);
+  assert.match(render({ betano: { at: Date.now() - 7 * 3600e3, fresh: false } }), /Lectura de Betano de hace 7 horas: líneas estimadas/);
+  for (const data of [{ betano: null }, {}]) {
+    const html = render(data);
+    assert.match(html, /Líneas estimadas: sin lectura de Betano/);
+    assert.doesNotMatch(html, /<th scope="col">Betano/); // sin cuotas no hay columna
+  }
+  // Con lectura fresca, la selección trae cuota y ventaja del servidor; la sospechosa muestra la cuota sin la ventaja.
+  const [ml, ...rest] = markets;
+  const [a, b] = ml.selections;
+  const withOdds = [{ ...ml, selections: [{ ...a, betano: 1.91, edge: 0.04 }, { ...b, betano: 2.6, edge: 0.31, suspect: true }] }, ...rest];
+  const html = marketTables(d, { data: { markets: withOdds, betano: { at, fresh: true } }, accuracy: null }, { picks: [], store: noStore, league: 'nba' });
+  assert.match(html, /<th scope="col">Betano/);
+  assert.match(html, /1\.91 <small class="pos">\+4 %<\/small>/);
+  assert.match(html, /2\.60 <small class="pp-na">por verificar<\/small>/);
+  assert.doesNotMatch(html, /31 %/);
+});
+
+test('Mejores apuestas: con cuota de Betano, la ventaja con signo; "sin valor" si paga menos de lo justo y "por verificar" si es sospechosa', async () => {
+  const { default: view, betanoText } = await import('../public/views/picks.js');
+  assert.equal(String(betanoText({ p: 0.6 })), '');
+  assert.match(String(betanoText({ betano: 1.8, edge: 0.08, value: true })), /class="pos">Betano 1\.80 · \+8 %</);
+  assert.match(String(betanoText({ betano: 1.1, edge: -0.076, value: false })), /class="">Betano 1\.10 · -8 % · sin valor</);
+  const sus = String(betanoText({ betano: 2.6, edge: 0.31, value: true, suspect: true }));
+  assert.match(sus, /Betano 2\.60 · por verificar/);
+  assert.doesNotMatch(sus, /31 %|pos/);
+  // Sin value (servidor anterior) se deduce de la ventaja.
+  assert.match(String(betanoText({ betano: 1.1, edge: -0.05 })), /sin valor/);
+  const game = { id: 'g1', start: '2099-01-01T00:00:00Z', status: { state: 'pre' }, home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
+  const picks = [{ market: 'ml', name: 'Local', p: 0.84, minOdds: 1.25, betano: 1.1, edge: -0.076, value: false }, { market: 'ou', label: 'Totales', name: 'Más', line: 2.5, p: 0.6, minOdds: 1.75 }];
+  const el = {};
+  await view.render(el, { api: { games: async () => ({ data: [game] }), get: async (path) => (path === '/api/record' ? { data: null } : { accuracy: { publish: true }, data: [{ gameId: 'g1', picks, betano: { at: Date.now(), fresh: true } }] }) }, leagueInfo: { id: 'colombia', title: 'Liga BetPlay' } });
+  const s = String(el.innerHTML);
+  assert.match(s, /<b>1\.25<\/b><small class="">Betano 1\.10 · -8 % · sin valor<\/small>/);
+  assert.match(s, /<td><b>1\.75<\/b><\/td>/); // el pick sin cuota de Betano queda como antes
+});

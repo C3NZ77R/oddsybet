@@ -2,7 +2,7 @@
 // registro público. Base y ESPN falsos en memoria: sin red.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gradePick, reasonOf, scoreOf, runTick, runLearn, recordOf, dayOf, sameSecret, BACKFILL_DAYS, BACKFILL_STEPS } from '../lib/picklog.mjs';
+import { gradePick, reasonOf, scoreOf, runTick, runLearn, recordOf, dayOf, sameSecret, staleReads, BACKFILL_DAYS, BACKFILL_STEPS } from '../lib/picklog.mjs';
 import { LEAGUES } from '../public/leagues.js';
 
 const soc = (market, side, line, home, away, name = 'STATUS_FULL_TIME') => gradePick({ sport: 'soccer', market, side, line }, { home, away, name });
@@ -257,4 +257,40 @@ test('revisión: un partido sin marcador no muestra "null-null"', () => {
   assert.equal(scoreOf({ home: null, away: null, name: 'STATUS_CANCELED' }), null);
   assert.equal(scoreOf({ sets: [] }), null);
   assert.equal(gradePick({ sport: 'soccer', market: 'dc', side: 0 }, { home: null, away: null, name: 'STATUS_CANCELED' }).status, 'nula');
+});
+
+test('tick: guarda la cuota de Betano y su ventaja al congelar; sin lectura, null; cerrar no las toca', async () => {
+  const db = memDb(done);
+  const board = { [TODAY]: [game('a', NOW + 3_600_000)] };
+  const picks = { [TODAY]: [{ gameId: 'a', x: {}, picks: [pk('dc', 0.8, { featured: true, betano: 1.3, edge: 0.04001234, value: true }), pk('ou', 0.6, { line: 2.5 })] }] };
+  await runTick(deps(db, { board, picks }), { now: NOW });
+  const odds = (id) => { const r = db.rows.get(id); return [r.betanoOdds, r.betanoEdge]; };
+  assert.deepEqual(odds('colombia:a:dc'), [1.3, 0.04]);
+  assert.deepEqual(odds('colombia:a:ou'), [null, null]);
+  assert.deepEqual(Object.keys(db.rows.get('colombia:a:dc')), Object.keys(db.rows.get('colombia:a:ou')), 'mismas claves en todas las filas');
+  const later = NOW + 5 * 3_600_000;
+  const out = await runTick(deps(db, { board: {}, results: { [TODAY]: { a: { home: 2, away: 0, name: 'STATUS_FULL_TIME' } } } }), { now: later });
+  assert.equal(out.settled, 2);
+  assert.equal(db.rows.get('colombia:a:dc').status, 'ganada');
+  assert.deepEqual(odds('colombia:a:dc'), [1.3, 0.04]);
+});
+
+test('staleReads: avisa con partidos de hoy por jugar y la última lectura de hace más de 8 h; el tick lo deja en el log', async () => {
+  const H = 3_600_000, g = (t, at) => ({ t, at });
+  assert.equal(staleReads([], NOW), null);
+  assert.equal(staleReads(undefined, NOW), null);
+  assert.equal(staleReads([g(NOW + 2 * H, NOW - 8 * H)], NOW), null, 'a 8 h justas todavía no');
+  assert.match(staleReads([g(NOW + 2 * H, NOW - 9 * H), g(NOW + 3 * H, NOW - 8 * H - 1)], NOW), /^betano-alerta: 2 partidos de hoy por jugar/);
+  assert.equal(staleReads([g(NOW + 2 * H, NOW - 9 * H), g(NOW + 30 * H, NOW - H)], NOW), null, 'cuenta la lectura más reciente, de cualquier partido');
+  assert.equal(staleReads([g(NOW - H, NOW - 9 * H)], NOW), null, 'ya empezó');
+  assert.equal(staleReads([g(NOW + 12 * H, NOW - 9 * H)], NOW), null, 'es de mañana en Colombia');
+  const real = console.warn, seen = [];
+  console.warn = (m) => seen.push(m);
+  try {
+    await runTick({ ...deps(memDb(done)), reads: async () => ({ games: [g(NOW + 2 * H, NOW - 9 * H)] }) }, { now: NOW });
+    await runTick({ ...deps(memDb(done)), reads: async () => ({ games: [g(NOW + 2 * H, NOW - H)] }) }, { now: NOW });
+    await runTick(deps(memDb(done)), { now: NOW });
+  } finally { console.warn = real; }
+  assert.equal(seen.length, 1);
+  assert.match(seen[0], /^betano-alerta: 1 partidos de hoy por jugar y la última lectura es de hace 9 h$/);
 });

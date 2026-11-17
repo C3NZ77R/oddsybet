@@ -147,3 +147,44 @@ test('tenis: con lectura fresca el total de games sale en las líneas de Betano,
     assert.equal(old.betano.fresh, false);
   });
 });
+
+test('picksOf: la ventaja, value y suspect salen de la p final (con lo aprendido), no de la cruda; el orden sigue por p', () => {
+  const used = (a) => ({ sports: { soccer: { status: 'en_uso', markets: { btts: { a, b: 1 } } } } });
+  // Cruda: 0.6 × 2.2 − 1 = 0.32, sospechosa. Lo aprendido baja la p y con ella la ventaja.
+  const markets = [
+    { key: 'btts', label: 'Ambos marcan', selections: [{ name: 'Sí', p: 0.6, fair: 1.67, betano: 2.2, edge: 0.32, suspect: true }, { name: 'No', p: 0.4, fair: 2.5, betano: 1.6, edge: -0.36 }] },
+    { key: 'dnb', label: 'Sin empate', selections: [{ name: 'Local', p: 0.55, fair: 1.82 }, { name: 'Visitante', p: 0.45, fair: 2.22 }] },
+  ];
+  const of = (model) => picksOf('soccer', markets, { model, league: 'laliga' });
+  const [raw] = of(null);
+  assert.deepEqual([raw.p, raw.betano, raw.edge, raw.value, raw.suspect], [0.6, 2.2, 0.6 * 2.2 - 1, true, true]);
+  const some = of(used(-0.5)), btts = some.find((p) => p.market === 'btts');
+  assert.ok(btts.p < 0.5 && btts.raw === 0.6);
+  assert.deepEqual([btts.edge, btts.value, 'suspect' in btts], [btts.p * 2.2 - 1, true, false]);
+  assert.deepEqual(some.map((p) => p.market), ['dnb', 'btts'], 'ordenados por p, no por ventaja');
+  const low = of(used(-1)).find((p) => p.market === 'btts');
+  assert.deepEqual([low.edge, low.value], [low.p * 2.2 - 1, false]);
+  const dnb = some.find((p) => p.market === 'dnb');
+  assert.ok(!('betano' in dnb) && !('edge' in dnb) && !('value' in dnb), 'sin cuota de Betano, sin campos');
+});
+
+test('getPicks: el destacado no es un sospechoso; uno que Betano paga menos de lo justo sí, marcado sin valor', async () => {
+  const [events, board] = season(() => [1, 1]);
+  await withEspn(leagueRoute('esp.1', events, board), async () => {
+    const opts = { date: '20260411', now: NOW };
+    const feat = async (g) => { const { picks } = (await getPicks('laliga', g ? { ...opts, book: book(g) } : opts)).data[0]; return [picks, picks.filter((p) => p.featured)]; };
+    const [plain, f0] = await feat();
+    assert.deepEqual(f0, [plain[0]]);
+    // El más probable (Menos de 2.5) a cuota 100: sospechoso. Se destaca el siguiente, que no tiene cuota de Betano.
+    const g = { ou: [[2.5, 1.9, 100]], btts: [1.8, 1.95] };
+    const [a, f1] = await feat(g);
+    assert.deepEqual(a.map((p) => p.p), a.map((p) => p.p).sort((x, y) => y - x), 'siguen ordenados por p');
+    assert.deepEqual([a[0].market, a[0].suspect, a[0].featured], ['ou', true, undefined]);
+    assert.deepEqual(f1, [a[1]]);
+    assert.equal('betano' in a[1], false);
+    // Ese siguiente (doble oportunidad) a 1.30 paga menos de lo justo: sigue siendo el destacado, con value false.
+    const [b, f2] = await feat({ ...g, dc: [1.3, 1.3, 1.3] });
+    assert.deepEqual([b[1].market, b[1].value, b[1].featured], ['dc', false, true]);
+    assert.equal(f2.length, 1);
+  });
+});

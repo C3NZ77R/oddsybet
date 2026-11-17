@@ -11,6 +11,15 @@ const LATE = Symbol('tarde');
 // el porcentaje diría más de lo que la muestra sostiene.
 export const RECORD_MIN_N = 30;
 export const recordText = (r) => (!r ? '—' : r.n < RECORD_MIN_N ? 'muestra pequeña' : h`${fmtPct(r.hit, 0)} <small>en ${r.n} picks</small>`);
+// Cuota de Betano del pick (la leyó el servidor) y la ventaja si la probabilidad de Oddsy es la real. suspect: ventaja de
+// más de 25 %, casi siempre un mal emparejamiento; value false: Betano paga menos de lo justo. Sin cuota, nada.
+export function betanoText(p) {
+  if (p.betano == null) return '';
+  const n = Math.round(p.edge * 100) || 0; // || 0: un −0.3 % redondea a −0 y se pintaría "-0 %"
+  const pct = `${n > 0 ? '+' : ''}${n} %`;
+  const tag = p.suspect ? 'por verificar' : (p.value ?? p.edge > 0) ? pct : `${pct} · sin valor`;
+  return h`<small class="${!p.suspect && (p.value ?? p.edge > 0) ? 'pos' : ''}">Betano ${fmtOdds(p.betano)} · ${tag}</small>`;
+}
 const star = (p) => (p.featured ? h`<span class="pk-star" aria-label="Pick del partido">★</span> ` : '');
 
 // El porqué del pick del partido cotizado con la línea del mercado (x.mkt): qué decía el modelo solo y hacia dónde se
@@ -31,7 +40,7 @@ function gameCard(g, picks, x) {
     <p class="hint">${when(g.start)}</p>${why ? h`<p class="pk-why">${why}</p>` : ''}
     <table class="tbl"><caption class="sr-only">Mejores apuestas de ${g.home?.name} contra ${g.away?.name}</caption>
       <thead><tr><th scope="col">Apuesta</th><th scope="col">Probabilidad</th><th scope="col">Cuota mínima</th><th scope="col">Se cumplió</th></tr></thead>
-      <tbody>${picks.map((p) => h`<tr><td>${star(p)}${pickText(p, g)}</td><td>${fmtPct(p.p, 0)}</td><td><b>${fmtOdds(p.minOdds)}</b></td><td>${recordText(p.record)}</td></tr>`)}</tbody>
+      <tbody>${picks.map((p) => h`<tr><td>${star(p)}${pickText(p, g)}</td><td>${fmtPct(p.p, 0)}</td><td><b>${fmtOdds(p.minOdds)}</b>${betanoText(p)}</td><td>${recordText(p.record)}</td></tr>`)}</tbody>
     </table>${picks.some((p) => p.featured) ? h`<p class="hint">★ Mejor predicción del partido, la que cuenta en el registro de Oddsy.</p>` : ''}</section>`;
 }
 
