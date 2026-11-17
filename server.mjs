@@ -24,6 +24,7 @@ const RX = {
   // Fecha real: 20261399 cumple \d{8} y ESPN respondería 502.
   date: { test: (v) => /^(19|20)\d{6}$/.test(v) && new Date(Date.UTC(v.slice(0, 4), v.slice(4, 6) - 1, v.slice(6))).toISOString().slice(0, 10).replaceAll('-', '') === v },
   id: /^\d{1,12}$/,
+  num: /^-?\d{1,3}(\.\d{1,2})?$/,
   game: /^(ls)?\d{1,12}$/, // ls: partidos del Challenger (LiveScore, lib/challenger.mjs)
   ids: /^\d{1,12}(,\d{1,12}){0,39}$/,
   season: /^(19|20)\d\d$/,
@@ -52,9 +53,15 @@ function teamLeague(url) {
   return id;
 }
 
+// Líneas de la casa (spread = hándicap del local) para cotizar ahí; solo en el detalle de un partido.
+const overOf = (url) => {
+  const [spread, total] = ['spread', 'total'].map((k) => param(url, k, RX.num));
+  return url.searchParams.get('game') ? { ...(spread != null && { spread: Number(spread) }), ...(total != null && { total: Number(total) }) } : {};
+};
+
 const ROUTES = {
   '/api/leagues': async () => ({ source: 'espn', data: LEAGUES }),
-  '/api/markets': async (url) => getMarkets(leagueParam(url), { game: param(url, 'game', RX.game), date: param(url, 'date', RX.date) }),
+  '/api/markets': async (url) => getMarkets(leagueParam(url), { game: param(url, 'game', RX.game), date: param(url, 'date', RX.date), over: overOf(url) }),
   '/api/picks': async (url) => {
     const league = leagueParam(url), date = param(url, 'date', RX.date);
     return getPicks(league, { date, model: await currentModel() }); // con lo que aprendió el registro de picks

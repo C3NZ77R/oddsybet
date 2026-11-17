@@ -29,9 +29,23 @@ export async function grab(target) {
   const idOf = (href) => String(href).match(/\/cuotas-de-partido\/[^/]+\/(\d+)/)?.[1];
   const own = idOf(location.pathname);
   const ids = own ? [own] : [...new Set([...document.querySelectorAll('a[href*="/cuotas-de-partido/"]')].map((a) => idOf(a.href)).filter(Boolean))];
-  if (!/(^|\.)betano\./.test(location.hostname) || !ids.length) return alert('Abre en Betano la página de la NBA o un partido y vuelve a tocar el marcador.');
+  if (!/(^|\.)betano\./.test(location.hostname) || !ids.length) return alert('Abre en Betano la página de una liga o de un partido y vuelve a tocar el marcador.');
+  // Mercados de partido que Oddsy compara (tipos de la API de Betano, vistos el 2026-11-11). El 1X2 del fútbol y
+  // el ganador del tenis solo vienen en la página de la liga, así que se piden también ahí.
+  const GAME = ['MRES', 'H2HT', 'HTOH', 'FHOT', 'FTPO', 'HCTG', 'BTSC'];
+  const gameOf = (m) => (GAME.includes(m?.type) && m.selections?.length ? [[m.type, m.selections.map((s) => [s.fullName || s.name, s.price, s.handicap ?? 0])]] : []);
+  const main = new Map();
+  if (!own) {
+    const walk = (o) => {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o.events)) for (const e of o.events) if (e?.id) main.set(String(e.id), e.markets ?? []);
+      for (const v of Object.values(o)) walk(v);
+    };
+    walk(await fetch(`/api${location.pathname}?bt=1`).then((r) => r.json()).catch(() => null));
+  }
   const events = await Promise.all(ids.slice(0, 20).map(async (id) => {
     const ev = await fetch(`/api/cuotas-de-partido/x/${id}/?bt=1`).then((r) => r.json()).then((j) => j.data?.event).catch(() => null);
+    const games = [...(main.get(id) ?? []), ...(ev?.markets ?? [])].flatMap(gameOf);
     const markets = (ev?.markets ?? []).flatMap((m) => {
       const t = m.tableLayout;
       if (!/Más\/Menos/.test(t?.title ?? '')) return [];
@@ -42,10 +56,10 @@ export async function grab(target) {
       });
       return rows.length ? [[t.title.trim(), rows]] : [];
     });
-    return markets.length ? [ev.name, ev.startTime, markets] : null;
+    return ev && (markets.length || games.length) ? [ev.name, ev.startTime, markets, games] : null;
   }));
   const found = events.filter(Boolean);
-  if (!found.length) return alert('No encontré líneas Más/Menos de jugadores en esta página de Betano.');
+  if (!found.length) return alert('No encontré cuotas en esta página de Betano.');
   const zip = new Blob([JSON.stringify(found)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
   let bin = '';
   for (const b of new Uint8Array(await new Response(zip).arrayBuffer())) bin += String.fromCharCode(b);
@@ -77,8 +91,37 @@ export function linesOf(events) {
   return out;
 }
 
-// El parámetro d de #/betano: base64url de deflate-raw. Si algo falla o descomprime a más de MAX_BYTES, {}.
-export async function decode(d) {
+// Mercados de partido de grab (ev[3]) → [{ t, teams: [1, 2], ml: [1, (X), 2], spread: [hcp de 1, cuota 1, cuota 2],
+// ou: [[línea, Más, Menos]], btts: [Sí, No] }]. En Betano la primera selección es el equipo 1 y la última el 2.
+export function gamesOf(events) {
+  const out = [];
+  const odds = (x) => (typeof x === 'number' && x > 1 && x < 1000 ? x : null);
+  for (const ev of Array.isArray(events) ? events.slice(0, 30) : []) {
+    const teams = typeof ev?.[0] === 'string' ? ev[0].split(' - ') : [];
+    if (teams.length !== 2 || !Number.isFinite(ev[1]) || !Array.isArray(ev[3])) continue;
+    const g = { t: ev[1], teams: teams.map((s) => s.trim().slice(0, 60)), ou: [] };
+    for (const [type, sels] of ev[3].slice(0, 40)) {
+      if (!Array.isArray(sels)) continue;
+      const s = sels.slice(0, 40).filter((x) => Array.isArray(x) && typeof x[0] === 'string').map(([n, p, h]) => [n, odds(p), Number.isFinite(h) ? h : 0]);
+      if (type === 'MRES' && s.length === 3) g.ml = s.map((x) => x[1]);
+      else if ((type === 'H2HT' || type === 'HTOH') && s.length === 2) g.ml = s.map((x) => x[1]);
+      else if (type === 'FHOT' && s.length === 2) g.spread = [s[0][2], s[0][1], s[1][1]];
+      else if (type === 'BTSC' && s.length === 2) g.btts = s.map((x) => x[1]);
+      else if (type === 'FTPO' || type === 'HCTG') {
+        for (const [n, p, h] of s) {
+          let row = g.ou.find((r) => r[0] === h);
+          if (!row) g.ou.push(row = [h, null, null]);
+          row[/^Más/i.test(n) ? 1 : 2] = p;
+        }
+      }
+    }
+    if (g.ml || g.spread || g.btts || g.ou.length) out.push(g);
+  }
+  return out;
+}
+
+// El parámetro d de #/betano: base64url de deflate-raw → { lines, games }. Si algo falla o pasa de MAX_BYTES, vacío.
+export async function decodeAll(d) {
   try {
     const bin = atob(String(d ?? '').replace(/-/g, '+').replace(/_/g, '/'));
     const reader = new Blob([Uint8Array.from(bin, (c) => c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
@@ -86,20 +129,80 @@ export async function decode(d) {
     for (let n = 0; ;) {
       const { done, value } = await reader.read();
       if (done) break;
-      if ((n += value.length) > MAX_BYTES) { await reader.cancel(); return {}; }
+      if ((n += value.length) > MAX_BYTES) { await reader.cancel(); return { lines: {}, games: [] }; }
       parts.push(value);
     }
-    return linesOf(JSON.parse(await new Blob(parts).text()));
+    const events = JSON.parse(await new Blob(parts).text());
+    return { lines: linesOf(events), games: gamesOf(events) };
   } catch {
-    return {};
+    return { lines: {}, games: [] };
   }
 }
+export const decode = async (d) => (await decodeAll(d)).lines;
 
 // Líneas guardadas (store 'betano'), o null si no hay o tienen más de 12 h.
 export const saved = (store) => { const b = store.get('betano'); return b?.lines && Date.now() - b.at < TTL ? b : null; };
-// Un partido suelto se suma a lo que ya había; las líneas nuevas ganan.
-export const save = (store, lines) => store.set('betano', { at: Date.now(), lines: { ...saved(store)?.lines, ...lines } });
+// Un partido suelto se suma a lo que ya había; lo nuevo gana (un partido se reemplaza por sus mismos equipos y hora).
+export function save(store, lines, games = []) {
+  const old = saved(store), same = (a, b) => a.t === b.t && a.teams.join() === b.teams.join();
+  store.set('betano', { at: Date.now(), lines: { ...old?.lines, ...lines }, games: [...(old?.games ?? []).filter((g) => !games.some((n) => same(g, n))), ...games] });
+}
 export const lineFor = (b, player, stat) => b?.lines[keyOf(player, stat)] ?? null;
+
+// Palabras de 3+ letras en común entre dos nombres de equipo o jugador ("Indiana Pacers" / "Pacers" → 1).
+const words = (s) => new Set(String(s ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3));
+const shared = (a, b) => { const w = words(b); return [...words(a)].filter((x) => w.has(x)).length; };
+
+// El partido de Betano de un juego de Oddsy (d.start, d.home.name, d.away.name) → { g, flip } o null. flip: el
+// equipo 1 de Betano es el visitante de Oddsy. Pide los dos equipos y menos de 12 h de diferencia en el inicio.
+export function gameFor(b, d) {
+  const t = Date.parse(d?.start);
+  let best = null;
+  for (const g of b?.games ?? []) {
+    if (!Number.isFinite(t) || Math.abs(g.t - t) > 12 * 3600 * 1000) continue;
+    for (const flip of [false, true]) {
+      const [h, a] = flip ? [g.teams[1], g.teams[0]] : g.teams;
+      const sh = shared(h, d.home?.name), sa = shared(a, d.away?.name);
+      // "Manchester City" y "Manchester United" comparten una palabra: gana la que comparte más con cada lado.
+      if (sh && sa && (!best || sh + sa > best.score)) best = { g, flip, score: sh + sa };
+    }
+  }
+  return best && { g: best.g, flip: best.flip };
+}
+
+// Líneas de Betano de un partido de básquet para que el servidor cotice ahí: { spread: hándicap del local, total }.
+// null si Betano no trae ninguna (fútbol y tenis ya publican varias líneas).
+export function overOf(hit) {
+  if (!hit?.g.spread && hit?.g.ou.length !== 1) return null;
+  const { g, flip } = hit;
+  const out = { ...(g.spread && { spread: flip ? -g.spread[0] : g.spread[0] }), ...(g.ou.length === 1 && { total: g.ou[0][0] }) };
+  return Object.keys(out).length ? out : null;
+}
+
+// Cuota de Betano para una selección de un mercado de Oddsy (lib/markets.mjs), o null si Betano no la tiene.
+export function priceFor(hit, m, s) {
+  if (!hit) return null;
+  const { g, flip } = hit;
+  const side = s.name === 'Local' || s.name === 'A' ? 0 : s.name === 'Visitante' || s.name === 'B' ? 1 : null;
+  const bt = (i) => (flip ? 1 - i : i); // índice del equipo de Oddsy en Betano
+  if ((m.key === 'ml' || m.key === '1x2') && g.ml) {
+    if (s.name === 'Empate') return g.ml.length === 3 ? g.ml[1] : null;
+    if (side == null || (m.key === '1x2') !== (g.ml.length === 3)) return null;
+    return bt(side) === 0 ? g.ml[0] : g.ml.at(-1);
+  }
+  if (m.key === 'spread' && g.spread && side != null) {
+    const [hcp, p1, p2] = g.spread;
+    const homeLine = flip ? -hcp : hcp; // línea del local de Oddsy en Betano
+    if (s.line !== (side === 0 ? homeLine : -homeLine)) return null;
+    return bt(side) === 0 ? p1 : p2;
+  }
+  if (m.key === 'ou' && s.line != null) {
+    const row = g.ou.find((r) => r[0] === s.line);
+    return row ? (s.name === 'Más' ? row[1] : s.name === 'Menos' ? row[2] : null) : null;
+  }
+  if (m.key === 'btts' && g.btts) return s.name === 'Sí' ? g.btts[0] : s.name === 'No' ? g.btts[1] : null;
+  return null;
+}
 
 // El prop del servidor llevado a otra línea, con su misma media y varianza.
 export function atLine(p, line, side = p.side) {

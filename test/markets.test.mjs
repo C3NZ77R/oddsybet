@@ -279,6 +279,8 @@ test('mercados: un partido terminado se cotiza con los ratings de antes de jugar
     const one = await getMarkets('laliga', { game: 'g' });
     assert.equal(sel(pick(one.data.markets, '1x2'), 'Local').p, local);
     for (const m of one.data.markets) for (const s of m.selections) assert.ok(s.p <= MAX_P, `${m.label} ${s.name}`);
+    const cs = pick(one.data.markets, 'cs'); // Betano solo lista marcadores: "Otro" no se publica
+    assert.ok(cs.selections.length >= 2 && cs.selections.every((s) => /^\d+-\d+$/.test(s.name)));
   });
 });
 
@@ -418,4 +420,16 @@ test('mercados: un partido por jugar con la línea de la casa en el scoreboard s
     const [a, b] = await Promise.all([getPicks('colombia', { date: '20260411' }), getPicks('colombia', { date: '20260411', model: shift })]);
     assert.deepEqual(a.data.find((x) => x.gameId === 'g').picks, b.data.find((x) => x.gameId === 'g').picks);
   });
+});
+
+test('básquet: hándicap y total se cotizan en la media línea de la casa; la de Betano gana y una entera se ignora', async () => {
+  const { bookLines } = await import('../lib/markets.mjs');
+  const line = { spread: { line: -6.5, p: 0.5 }, total: { line: 221.5, p: 0.5 } };
+  assert.deepEqual(bookLines(line), { spread: -6.5, total: 221.5 });
+  assert.deepEqual(bookLines(line, { total: 219.5 }), { spread: -6.5, total: 219.5 });
+  assert.deepEqual(bookLines({ spread: { line: -7, p: 0.5 } }), {});
+  assert.deepEqual(bookLines(null), {});
+  const ms = marketsFor('basketball', NBA, bookLines(line));
+  assert.equal(pick(ms, 'spread').label, 'Hándicap local -6.5');
+  assert.equal(pick(ms, 'ou').selections[0].line, 221.5);
 });

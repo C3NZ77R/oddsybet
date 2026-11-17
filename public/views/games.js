@@ -6,6 +6,7 @@ import { LEAGUES, leagueById } from '../leagues.js';
 import { statForMarket } from '../stats.js';
 import { ui as baseUi, dataOf, propKey, ymd } from '../ui.js';
 import { mainTotal } from '../live.js';
+import * as B from '../betano.js';
 
 const DAYS = 15; // hoy + 14
 const TENNIS_DAYS = 3; // ESPN solo publica el cuadro de los próximos días
@@ -66,7 +67,7 @@ const syncPicks = (root, ctx) => ctx.store.on('picks', (list) => {
 // Barra de tendencia: un segmento por partido (más reciente a la derecha).
 function trend(values, good, bad, what) {
   const v = (values ?? []).filter((x) => x != null);
-  if (!v.length) return '<span class="gm-trend gm-na">—</span>';
+  if (!v.length) return '<span class="gm-trend pp-na">—</span>';
   const k = v.filter((x) => x === good).length;
   const label = `${what}: ${k} de ${v.length}`;
   return `<span class="gm-trend" role="img" aria-label="${esc(label)}" title="${esc(label)}"><span class="gm-segs">${[...v].reverse().map((x) => `<i class="${x === good ? 'w' : x === bad ? 'l' : 'p'}"></i>`).join('')}</span><small>${k}/${v.length}</small></span>`;
@@ -84,7 +85,7 @@ function teamRow(g, side, tennis, odds = '') {
   const t = g[side];
   const score = g.status?.state !== 'pre' && t.score != null ? `<b class="gm-score">${esc(t.score)}</b>` : '';
   return `<div class="gm-team">${ui.teamLogo(t)}<span class="gm-tname"><span class="gm-tl"><b>${esc(t.abbr || t.name)}</b>${tennis ? '' : ` <small>${esc(t.name)}</small>`}</span>
-      <span class="gm-tl">${t.record ? `<small class="gm-rec">${esc(t.record)}</small>` : ''}${tennis ? '' : `<span class="gm-tr" data-trend="${side}"><span class="gm-trend gm-na" aria-hidden="true">…</span></span>`}</span></span>${score}<span class="gm-odds" data-slot="${side}">${odds}</span></div>`;
+      <span class="gm-tl">${t.record ? `<small class="gm-rec">${esc(t.record)}</small>` : ''}${tennis ? '' : `<span class="gm-tr" data-trend="${side}"><span class="gm-trend pp-na" aria-hidden="true">…</span></span>`}</span></span>${score}<span class="gm-odds" data-slot="${side}">${odds}</span></div>`;
 }
 
 // Orden de las filas de la tarjeta (de arriba abajo). En tenis home = jugador A, arriba.
@@ -395,9 +396,15 @@ function linesHtml(d, mk, ctx) {
 // Mercados del modelo como desplegables: el título muestra la opción más probable, dentro va qué se apuesta,
 // una barra por probabilidad y la cuota. trends = HTML de tendencia por clave de mercado (solo en el primero de cada tipo).
 export function marketTables(d, mk, ctx, trends = {}) {
-  const head = '<thead><tr><th scope="col">Opción</th><th scope="col">Probabilidad</th><th scope="col">Justa</th><th scope="col">Oddsy</th></tr></thead>';
+  // Cuotas de Betano que trajo el marcador (public/betano.js): columna extra con la ventaja si la probabilidad de Oddsy es la real.
+  const bt = B.gameFor(B.saved(ctx.store), d);
+  const btCell = (m, s) => {
+    const price = B.priceFor(bt, m, s), e = B.edge(s.p, price);
+    return e == null ? '<td class="pp-na">—</td>' : `<td>${esc(ui.fmtOdds(price))} <small class="${e > 0 ? 'pos' : 'pp-na'}">${e > 0 ? '+' : ''}${Math.round(e * 100)} %</small></td>`;
+  };
+  const head = `<thead><tr><th scope="col">Opción</th><th scope="col">Probabilidad</th><th scope="col">Justa</th><th scope="col">Oddsy</th>${bt ? '<th scope="col">Betano</th>' : ''}</tr></thead>`;
   const row = (m, s, top) => `<tr${s === top ? ' class="gm-top1"' : ''}><th scope="row">${esc(selName(d, s))}${s.line != null ? ` <span class="gm-line">${esc(lineTxt(m, s))}</span>` : ''}${s === top ? ' <small class="gm-tag">Más probable</small>' : ''}</th>
-    <td><span class="gm-pc"><span class="gm-pbar" aria-hidden="true"><i style="width:${(s.p * 100).toFixed(1)}%"></i></span>${esc(ui.fmtPct(s.p))}</span></td><td>${esc(ui.fmtOdds(s.fair))}</td><td>${selBtn(d, m, s, ctx)}</td></tr>`;
+    <td><span class="gm-pc"><span class="gm-pbar" aria-hidden="true"><i style="width:${(s.p * 100).toFixed(1)}%"></i></span>${esc(ui.fmtPct(s.p))}</span></td><td>${esc(ui.fmtOdds(s.fair))}</td><td>${selBtn(d, m, s, ctx)}</td>${bt ? btCell(m, s) : ''}</tr>`;
   const seen = new Set(), main = mainTotal(mk.data.markets);
   // x.mkt: cotizado con la línea del mercado (lib/book.mjs); la línea misma no se muestra.
   return `<p class="gm-src">${ui.sourceBadge('oddsy')}${mk.data.x?.mkt ? ' Con la línea del mercado, que en el backtest acierta más que el modelo solo.' : ''}</p>`
@@ -471,7 +478,7 @@ function propsHtml(props, league, gameId, sport, kind) {
     lines.get(lk).sides[p.side] = p;
   }
   const sideCell = (p) => {
-    if (!p) return '<td class="gm-na">—</td>';
+    if (!p) return '<td class="pp-na">—</td>';
     const b = top(p);
     const label = `${p.side === 'Over' ? 'Más de' : p.side === 'Under' ? 'Menos de' : p.side} ${p.line}`;
     return `<td>${kind === 'player' ? `<a href="#/${esc(league)}/props/${propKey(p)}" aria-label="${esc(`${p.player}: ${label} ${statName(p)}, ver detalle`)}">` : ''}${esc(p.line)} ${b ? `<b>${esc(ui.fmtOdds(b.price))}</b>${ui.bookChip(b.title || b.key)}` : ''}${kind === 'player' ? '</a>' : ''}</td>`;
@@ -547,7 +554,11 @@ async function renderDetail(root, ctx, lg, id, state) {
     return;
   }
   const d = dRes.value;
-  const mk = mRes.status === 'fulfilled' ? mRes.value : { error: mRes.reason };
+  let mk = mRes.status === 'fulfilled' ? mRes.value : { error: mRes.reason };
+  // Con las líneas de Betano de este partido (básquet), Oddsy cotiza ahí: así hay con qué comparar la suya.
+  const over = B.overOf(B.gameFor(B.saved(ctx.store), d));
+  if (over && !mk.error) mk = await api.markets(lg.id, id, null, over).catch(() => mk);
+  if (state.dead) return;
   const pc = { league: lg.id, store: ctx.store, picks: [] };
   state.cleanups.push(syncPicks(root, pc));
   const lazy = (kind) => `<div data-props="${kind}">${ui.loading()}</div>`;

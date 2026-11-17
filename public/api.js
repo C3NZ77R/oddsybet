@@ -88,7 +88,7 @@ function flush(lg) {
 export const api = {
   get,
   leagues: () => get('/api/leagues'),
-  markets: (league, gameId, date) => get('/api/markets', { league, game: gameId, date }),
+  markets: (league, gameId, date, over = {}) => get('/api/markets', { league, game: gameId, date, ...over }),
   accuracy: () => get('/api/accuracy'),
   games: (league, date) => get('/api/games', { league, date }),
   game: (league, id) => get('/api/game', { league, id }),

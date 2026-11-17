@@ -51,7 +51,7 @@ test('challenger: getMarkets cotiza los del día con el Elo del Challenger y la 
     assert.equal(pre.game.league, 'challenger');
     const ml = pre.markets.find((m) => m.key === 'ml');
     assert.ok(Math.abs(ml.selections[0].p + ml.selections[1].p - 1) < 1e-9);
-    assert.ok(pre.markets.some((m) => m.key === 'ou_set1'), 'games del primer set con el largo del set del Challenger');
+    assert.ok(!pre.markets.some((m) => m.key === 'ou_set1' || m.key === 'ou_sets'), 'Betano no ofrece total de sets ni games del primer set');
     const games = await getTennisGames('challenger', '20261109');
     assert.deepEqual(games.map((g) => g.id).sort(), data.map((x) => x.gameId).sort());
     assert.equal(games.find((g) => g.id === 'ls1916573').status.detail, '6-3 4-6 7-5');

@@ -154,7 +154,7 @@ test('server: /api/markets?league=atp con Elo, Markov y nombres de jugador', () 
   const ml = body.data.markets.find((m) => m.key === 'ml');
   assert.deepEqual(ml.selections.map((s) => s.name), ['A. Zverev', 'B. Shelton']);
   assert.ok(Math.abs(ml.selections[0].p + ml.selections[1].p - 1) < 1e-9);
-  assert.ok(body.data.markets.some((m) => m.key === 'ou_sets' && m.label === 'Total de sets 3.5')); // final de Grand Slam: a 5 sets
+  assert.ok(!body.data.markets.some((m) => m.key === 'ou_sets' || m.key === 'ou_set1')); // Betano no los ofrece
   assert.ok(body.data.markets.some((m) => m.label === 'A. Zverev gana al menos un set'));
   assert.equal((await call('/api/markets?league=atp&game=999999')).status, 404);
   const day = await call('/api/markets?league=atp&date=20260913');

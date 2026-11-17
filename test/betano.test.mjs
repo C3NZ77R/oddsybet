@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { grab, bookmarklet, linesOf, decode, save, saved, lineFor, atLine, edge } from '../public/betano.js';
+import { grab, bookmarklet, linesOf, decode, decodeAll, gamesOf, gameFor, priceFor, save, saved, lineFor, atLine, edge } from '../public/betano.js';
 import { propOver, price } from '../public/betmath.js';
 import { store } from '../public/store.js';
 
@@ -48,7 +48,7 @@ test('el marcador lee un partido y Oddsy recupera sus líneas del enlace', async
 test('en la página de la liga lee cada partido enlazado una sola vez y se salta los que no tienen líneas', async () => {
   const links = ['/cuotas-de-partido/denver-nuggets-toronto-raptors/94469092/', '/cuotas-de-partido/denver-nuggets-toronto-raptors/94469092/?ms=PLNP', '/cuotas-de-partido/indiana-pacers-new-york-knicks/91849791/'];
   const r = await runGrab('/sport/baloncesto/ee-uu/nba/441g/', links);
-  assert.deepEqual(r.asked, ['/api/cuotas-de-partido/x/94469092/?bt=1', '/api/cuotas-de-partido/x/91849791/?bt=1']);
+  assert.deepEqual(r.asked, ['/api/sport/baloncesto/ee-uu/nba/441g/?bt=1', '/api/cuotas-de-partido/x/94469092/?bt=1', '/api/cuotas-de-partido/x/91849791/?bt=1']);
   assert.deepEqual(await decode(r.href.split('d=')[1]), WANT);
 });
 
@@ -121,4 +121,88 @@ test('atLine: una línea casi segura (Más de 0.5 con media 10) no se cotiza: to
   assert.equal(atLine(p, 0.5), null);
   assert.equal(atLine(p, 0.5, 'Under'), null);
   assert.ok(atLine(p, 9.5));
+});
+
+// Recortes reales de Betano del 2026-11-11: Premier (página de la liga + detalle), NBA y ATP (página de la liga).
+const sel = (name, price, handicap = 0) => [name, price, handicap];
+const SOCCER = ['Manchester City - Fulham', 1795264200000, [], [
+  ['MRES', [sel('Manchester City', 1.47), sel('Empate', 4.7), sel('Fulham', 6.5)]],
+  ['HCTG', [sel('Más de 2.5', 1.52, 2.5), sel('Menos 2.5', 2.57, 2.5), sel('Más de 3.5', 2.22, 3.5), sel('Menos 3.5', 1.67, 3.5)]],
+  ['BTSC', [sel('Sí', 1.65), sel('No', 2.15)]],
+]];
+const NBA = ['Indiana Pacers - Washington Wizards', 1795222800000, [], [
+  ['H2HT', [sel('Indiana Pacers', 1.7), sel('Washington Wizards', 2.18)]],
+  ['FHOT', [sel('Indiana Pacers -2.5', 1.91, -2.5), sel('Washington Wizards +2.5', 1.9, 2.5)]],
+  ['FTPO', [sel('Más de 228.5', 1.93, 228.5), sel('Menos 228.5', 1.87, 228.5)]],
+]];
+const ATP = ['Alex Michelsen - Alejandro Tabilo', 1795200000000, [], [['HTOH', [sel('Alex Michelsen', 1.27), sel('Alejandro Tabilo', 3.8)]]]];
+
+test('gamesOf arma los mercados de partido y descarta lo que no cuadra', () => {
+  const [s, n, a] = gamesOf([SOCCER, NBA, ATP, ['Sin guion', 1, [], []], ['A - B', 'x', [], []], 'basura']);
+  assert.deepEqual(s, { t: 1795264200000, teams: ['Manchester City', 'Fulham'], ml: [1.47, 4.7, 6.5], ou: [[2.5, 1.52, 2.57], [3.5, 2.22, 1.67]], btts: [1.65, 2.15] });
+  assert.deepEqual(n, { t: 1795222800000, teams: ['Indiana Pacers', 'Washington Wizards'], ml: [1.7, 2.18], spread: [-2.5, 1.91, 1.9], ou: [[228.5, 1.93, 1.87]] });
+  assert.deepEqual(a.ml, [1.27, 3.8]);
+  assert.equal(gamesOf([SOCCER, NBA, ATP, ['Sin guion', 1, [], []]]).length, 3);
+  assert.deepEqual(gamesOf(null), []);
+});
+
+test('gameFor encuentra el partido por equipos y hora, y priceFor da la cuota de cada selección', () => {
+  const b = { games: gamesOf([SOCCER, NBA, ATP]) };
+  const team = (name) => ({ name });
+  const city = gameFor(b, { start: '2026-11-21T15:30:00Z', home: team('Manchester City'), away: team('Fulham') });
+  assert.equal(city.flip, false);
+  const m1x2 = { key: '1x2' }, mOu = { key: 'ou' }, mBtts = { key: 'btts' }, mMl = { key: 'ml' }, mSp = { key: 'spread' };
+  assert.equal(priceFor(city, m1x2, { name: 'Local' }), 1.47);
+  assert.equal(priceFor(city, m1x2, { name: 'Empate' }), 4.7);
+  assert.equal(priceFor(city, m1x2, { name: 'Visitante' }), 6.5);
+  assert.equal(priceFor(city, mOu, { name: 'Menos', line: 3.5 }), 1.67);
+  assert.equal(priceFor(city, mOu, { name: 'Más', line: 4.5 }), null); // Betano no la trajo
+  assert.equal(priceFor(city, mBtts, { name: 'Sí' }), 1.65);
+  assert.equal(priceFor(city, mMl, { name: 'Local' }), null); // ganador de dos vías contra un 1X2: no se mezcla
+  // Otro partido de Manchester con Fulham de visita no existe: United no debe tomar la cuota del City por "Manchester".
+  assert.equal(gameFor(b, { start: '2026-11-21T15:30:00Z', home: team('Manchester United'), away: team('Chelsea') }), null);
+  assert.equal(gameFor(b, { start: '2026-11-25T15:30:00Z', home: team('Manchester City'), away: team('Fulham') }), null); // otro día
+
+  // Con los equipos al revés que Betano: el hándicap y el ganador se voltean.
+  const ind = gameFor(b, { start: '2026-11-21T00:00:00Z', home: team('Washington Wizards'), away: team('Indiana Pacers') });
+  assert.equal(ind.flip, true);
+  assert.equal(priceFor(ind, mMl, { name: 'Local' }), 2.18);
+  assert.equal(priceFor(ind, mMl, { name: 'Visitante' }), 1.7);
+  assert.equal(priceFor(ind, mSp, { name: 'Local', line: 2.5 }), 1.9);
+  assert.equal(priceFor(ind, mSp, { name: 'Visitante', line: -2.5 }), 1.91);
+  assert.equal(priceFor(ind, mSp, { name: 'Local', line: 3.5 }), null); // otra línea
+  assert.equal(priceFor(ind, mOu, { name: 'Más', line: 228.5 }), 1.93);
+
+  const ten = gameFor(b, { start: '2026-11-20T18:00:00Z', home: team('Alex Michelsen'), away: team('Alejandro Tabilo') });
+  assert.equal(priceFor(ten, mMl, { name: 'A' }), 1.27);
+  assert.equal(priceFor(ten, mMl, { name: 'B' }), 3.8);
+  assert.equal(priceFor(null, mMl, { name: 'A' }), null);
+});
+
+test('el marcador en una liga de fútbol trae el 1X2 de la página y los totales del detalle', async () => {
+  const saved = { location: globalThis.location, document: globalThis.document, fetch: globalThis.fetch, alert: globalThis.alert };
+  const league = { data: { blocks: [{ events: [{ id: '94991437', markets: [{ type: 'MRES', selections: [{ fullName: 'Manchester City', price: 1.47 }, { name: 'X', fullName: 'Empate', price: 4.7 }, { fullName: 'Fulham', price: 6.5 }] }] }] }] } };
+  const detail = { name: 'Manchester City - Fulham', startTime: 1795264200000, markets: [{ type: 'BTSC', selections: [{ name: 'Sí', price: 1.65 }, { name: 'No', price: 2.15 }] }, { type: 'ODEV', selections: [{ name: 'Par', price: 1.87 }] }] };
+  Object.assign(globalThis, {
+    location: { hostname: 'www.betano.co', pathname: '/sport/futbol/inglaterra/premier-league/1/', href: '' },
+    document: { querySelectorAll: () => [{ href: 'https://www.betano.co/cuotas-de-partido/manchester-city-fulham/94991437/' }] },
+    fetch: async (url) => ({ json: async () => (url.startsWith('/api/sport/') ? league : { data: { event: detail } }) }),
+    alert: () => {},
+  });
+  try {
+    await grab('https://oddsybet.vercel.app/#/betano?d=');
+    const { lines, games } = await decodeAll(globalThis.location.href.split('d=')[1]);
+    assert.deepEqual(lines, {});
+    assert.deepEqual(games, [{ t: 1795264200000, teams: ['Manchester City', 'Fulham'], ml: [1.47, 4.7, 6.5], ou: [], btts: [1.65, 2.15] }]);
+  } finally {
+    Object.assign(globalThis, saved);
+  }
+});
+
+test('save reemplaza un partido ya guardado por su versión nueva', (t) => {
+  t.after(() => store.set('betano', null));
+  store.set('betano', null);
+  save(store, {}, gamesOf([SOCCER]));
+  save(store, {}, [{ ...gamesOf([SOCCER])[0], ml: [1.5, 4.5, 6] }]);
+  assert.deepEqual(saved(store).games.map((g) => g.ml), [[1.5, 4.5, 6]]);
 });

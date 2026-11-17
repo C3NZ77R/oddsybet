@@ -3,7 +3,7 @@ import { api } from './api.js';
 import { store, encodePicks, decodePicks } from './store.js';
 import { ui, h, empty, fmtOdds, fmtPct, bookInfo, bookChip, raw } from './ui.js';
 import { LEAGUES, leagueById } from './leagues.js';
-import { decode as decodeBetano, save as saveBetano } from './betano.js';
+import { decodeAll as decodeBetano, save as saveBetano } from './betano.js';
 import { RG_LINE, importPicks, slipModel, combinedOdds, slipText, toastMs, hasUserInput } from './shell.js';
 import { initChat } from './chat.js';
 
@@ -133,12 +133,15 @@ function importShare(query) {
 
 // ---------- líneas de Betano (las trae el marcador de public/betano.js) ----------
 async function importBetano(query) {
-  const lines = await decodeBetano(query.get('d'));
+  const { lines, games } = await decodeBetano(query.get('d'));
   const n = Object.keys(lines).length, players = new Set(Object.keys(lines).map((k) => k.split('|')[0])).size;
-  if (n && !window.confirm(`¿Guardar ${n} líneas de Betano? Solo si las trajiste tú con el marcador de Oddsy.`)) { location.replace('#/nba/props'); return; }
-  if (n) saveBetano(store, lines);
-  toast(n ? `Llegaron ${n} líneas de Betano de ${players} jugadores.` : 'Este enlace no trae líneas de Betano.');
-  location.replace('#/nba/props');
+  // Con props, a los de la NBA; si solo hay partidos, a los Partidos de la última liga.
+  const back = n ? '#/nba/props' : `#/${lastLeague().id}/games`;
+  const what = [n && `${n} líneas de ${players} jugadores`, games.length && `cuotas de ${games.length} partidos`].filter(Boolean).join(' y ');
+  if (what && !window.confirm(`¿Guardar ${what} de Betano? Solo si las trajiste tú con el marcador de Oddsy.`)) { location.replace(back); return; }
+  if (what) saveBetano(store, lines, games);
+  toast(what ? `Llegaron ${what} de Betano.` : 'Este enlace no trae cuotas de Betano.');
+  location.replace(back);
 }
 
 async function sharePicks() {
