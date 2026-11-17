@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { grab, bookmarklet, linesOf, decode, decodeAll, gamesOf, gameFor, priceFor, save, saved, lineFor, atLine, edge } from '../public/betano.js';
+import { read, grab, bookmarklet, linesOf, decode, decodeAll, gamesOf, gameFor, priceFor, save, saved, lineFor, atLine, edge } from '../public/betano.js';
 import { propOver, price } from '../public/betmath.js';
 import { store } from '../public/store.js';
 
@@ -205,4 +205,98 @@ test('save reemplaza un partido ya guardado por su versión nueva', (t) => {
   save(store, {}, gamesOf([SOCCER]));
   save(store, {}, [{ ...gamesOf([SOCCER])[0], ml: [1.5, 4.5, 6] }]);
   assert.deepEqual(saved(store).games.map((g) => g.ml), [[1.5, 4.5, 6]]);
+});
+
+// read con las pestañas reales del 2026-11-16: en fútbol y tenis la 1 es parcial y "Todo" trae el resto.
+async function runRead(tabs, allTab, opts) {
+  const saved = { location: globalThis.location, document: globalThis.document, fetch: globalThis.fetch };
+  const asked = [];
+  const market = (type) => ({ type, selections: [{ name: 'A', price: 1.5 }, { name: 'B', price: 2.5 }] });
+  Object.assign(globalThis, {
+    location: { hostname: 'www.betano.co', pathname: '/sport/tenis/atp-finals/atp-finals/199527/' },
+    document: { querySelectorAll: () => ['1', '2', '3'].map((id) => ({ href: `https://www.betano.co/cuotas-de-partido/a-b/${id}/` })) },
+    fetch: async (url) => {
+      asked.push(url);
+      if (url.includes('/x/3/')) return { status: 429, json: async () => ({}) };
+      const all = url.endsWith(`bt=${allTab}`);
+      return { status: 200, json: async () => ({ data: { markets: tabs, event: { name: 'A - B', startTime: 1, markets: [market(all ? 'HTOH' : 'FTGO'), market(all ? 'HTOH' : 'XXXX')] } } }) };
+    },
+  });
+  try {
+    return { found: await read(opts).catch((e) => e.message), asked };
+  } finally {
+    Object.assign(globalThis, saved);
+  }
+}
+
+test('read pasa a la pestaña "Todo" desde el primer partido, quita mercados repetidos y corta con un 429', async () => {
+  const tennis = [{ id: '0', type: 'popular' }, { id: '1', type: 'gamesoverunder', selected: true }, { id: '9', type: 'allmarkets' }];
+  const r = await runRead(tennis, '9', { max: 2 });
+  assert.deepEqual(r.asked, ['/api/sport/tenis/atp-finals/atp-finals/199527/?bt=1', '/api/cuotas-de-partido/x/1/?bt=1', '/api/cuotas-de-partido/x/1/?bt=9', '/api/cuotas-de-partido/x/2/?bt=9']);
+  assert.deepEqual(r.found, [1, 2].map(() => ['A - B', 1, [], [['HTOH', [['A', 1.5, 0], ['B', 2.5, 0]]]]]));
+  // En la NBA la 1 es la de jugadores (las líneas de props): no se cambia.
+  const nba = await runRead([{ id: '1', type: 'players', selected: true }, { id: '6', type: 'all' }], '6', { max: 2 });
+  assert.deepEqual(nba.asked.slice(1), ['/api/cuotas-de-partido/x/1/?bt=1', '/api/cuotas-de-partido/x/2/?bt=1']);
+  assert.equal((await runRead(tennis, '9', {})).found, 'HTTP 429');
+});
+
+test('gamesOf pasa una lectura real del lector (2026-11-16) por los campos de siempre y los nuevos', async () => {
+  const { default: fx } = await import('./fixtures/betano-read.json', { with: { type: 'json' } });
+  const pairs = (rows) => rows.every((r) => r.length === 3 && Number.isFinite(r[0]) && r[1] > 1 && r[2] > 1);
+  const soccer = gamesOf(fx.epl), nba = gamesOf(fx.nba), atp = gamesOf(fx.atp);
+  assert.equal(soccer.length, 2);
+  for (const g of soccer) {
+    assert.equal(g.ml.length, 3);
+    assert.equal(g.btts.length, 2);
+    assert.equal(g.dc.length, 3);
+    assert.ok(g.dc.every((p) => p > 1) && g.dc[0] < g.ml[0] && g.dc[1] < g.ml[2]); // 1X paga menos que el 1, X2 menos que el 2
+    assert.ok(g.dnb[0] < g.ml[0] && g.dnb[1] < g.ml[2]);
+    for (const k of ['ou', 'ah', 'aou', 'tt1', 'tt2']) assert.ok(g[k].length && pairs(g[k]), k);
+    assert.ok(g.ah.some((r) => r[0] % 0.5 !== 0) && g.aou.some((r) => r[0] % 0.5 !== 0)); // líneas de cuarto
+    assert.ok(g.ou.every((r) => r[0] % 1 === 0.5));
+  }
+  assert.equal(nba.length, 2);
+  for (const g of nba) {
+    assert.deepEqual(Object.keys(g).sort(), ['ml', 'ou', 'spread', 't', 'teams']); // el básquet no cambia
+    assert.equal(g.ou.length, 1);
+  }
+  assert.ok(Object.keys(linesOf(fx.nba)).length > 20);
+  assert.equal(atp.length, 2);
+  for (const g of atp) {
+    assert.equal(g.ml.length, 2);
+    assert.equal(g.s1.length, 2);
+    assert.ok(g.s1.every((p) => p > 1));
+    assert.ok(g.gh.length && pairs(g.gh) && g.gou.length && pairs(g.gou));
+    assert.deepEqual(g.ou, []); // el total de games va en gou, no en ou
+    // El hándicap de games crece a favor del jugador 1: su cuota baja y la del 2 sube.
+    const gh = [...g.gh].sort((a, b) => a[0] - b[0]);
+    assert.ok(gh.at(0)[1] > gh.at(-1)[1] && gh.at(0)[2] < gh.at(-1)[2]);
+  }
+});
+
+test('priceFor con la lectura real: hándicap asiático, total asiático, goles por equipo, doble oportunidad y sin empate, también volteado', async () => {
+  const { readFileSync } = await import('node:fs');
+  const fx = JSON.parse(readFileSync(new URL('./fixtures/betano-read.json', import.meta.url), 'utf8'));
+  const g = gamesOf(fx.epl)[0], [t1, t2] = g.teams;
+  const hit = gameFor({ games: [g] }, { start: new Date(g.t).toISOString(), home: { name: t1 }, away: { name: t2 } });
+  const flipped = gameFor({ games: [g] }, { start: new Date(g.t).toISOString(), home: { name: t2 }, away: { name: t1 } });
+  assert.equal(hit.flip, false);
+  assert.equal(flipped.flip, true);
+  const [h, c1, c2] = g.ah[0];
+  assert.equal(priceFor(hit, { key: 'ah' }, { name: 'Local', line: h }), c1);
+  assert.equal(priceFor(hit, { key: 'ah' }, { name: 'Visitante', line: -h }), c2);
+  assert.equal(priceFor(flipped, { key: 'ah' }, { name: 'Local', line: -h }), c2); // el local de Oddsy es el equipo 2 de Betano
+  assert.equal(priceFor(hit, { key: 'ah' }, { name: 'Local', line: h + 7 }), null);
+  assert.equal(priceFor(hit, { key: 'aou' }, { name: 'Más', line: g.aou[0][0] }), g.aou[0][1]);
+  assert.equal(priceFor(hit, { key: 'ou_home' }, { name: 'Menos', line: g.tt1[0][0] }), g.tt1[0][2]);
+  assert.equal(priceFor(flipped, { key: 'ou_home' }, { name: 'Menos', line: g.tt2[0][0] }), g.tt2[0][2]);
+  assert.equal(priceFor(hit, { key: 'dc' }, { name: 'Local o empate' }), g.dc[0]);
+  assert.equal(priceFor(flipped, { key: 'dc' }, { name: 'Local o empate' }), g.dc[1]);
+  assert.equal(priceFor(hit, { key: 'dc' }, { name: 'Local o visitante' }), g.dc[2]);
+  assert.equal(priceFor(flipped, { key: 'dnb' }, { name: 'Local' }), g.dnb[1]);
+  const t = gamesOf(fx.atp)[0];
+  const th = gameFor({ games: [t] }, { start: new Date(t.t).toISOString(), home: { name: t.teams[0] }, away: { name: t.teams[1] } });
+  assert.equal(priceFor(th, { key: 'ou_games' }, { name: 'Más', line: t.gou[0][0] }), t.gou[0][1]);
+  assert.equal(priceFor(th, { key: 'first_set' }, { name: 'B' }), t.s1[1]);
+  assert.equal(priceFor(th, { key: 'games_hcp' }, { name: 'A', line: t.gh[0][0] }), t.gh[0][1]);
 });

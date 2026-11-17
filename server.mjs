@@ -13,6 +13,8 @@ import { trackFromEnv } from './lib/track-routes.mjs';
 import { currentModel } from './lib/learn.mjs';
 import { picklogFromEnv, sameSecret } from './lib/picklog.mjs';
 import { chat, parseBody, rateOk } from './lib/chat.mjs';
+import { dbFromEnv } from './lib/db.mjs';
+import { ingest as betanoIngest, loadReads } from './lib/betano-read.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -59,12 +61,15 @@ const overOf = (url) => {
   return url.searchParams.get('game') ? { ...(spread != null && { spread: Number(spread) }), ...(total != null && { total: Number(total) }) } : {};
 };
 
+// La lectura de Betano guardada (lib/betano-read.mjs) para cotizar en sus líneas; sin base configurada, null.
+const betanoBook = async () => { const db = dbFromEnv(); return db ? loadReads(db) : null; };
+
 const ROUTES = {
   '/api/leagues': async () => ({ source: 'espn', data: LEAGUES }),
-  '/api/markets': async (url) => getMarkets(leagueParam(url), { game: param(url, 'game', RX.game), date: param(url, 'date', RX.date), over: overOf(url) }),
+  '/api/markets': async (url) => getMarkets(leagueParam(url), { game: param(url, 'game', RX.game), date: param(url, 'date', RX.date), over: overOf(url), book: await betanoBook() }),
   '/api/picks': async (url) => {
     const league = leagueParam(url), date = param(url, 'date', RX.date);
-    return getPicks(league, { date, model: await currentModel() }); // con lo que aprendió el registro de picks
+    return getPicks(league, { date, model: await currentModel(), book: await betanoBook() }); // con lo que aprendió el registro de picks
   },
   '/api/accuracy': async () => ({ source: 'oddsy', data: getAccuracy() }),
   // Registro de picks de la liga (lib/picklog.mjs); sin Supabase, data null y la vista no lo muestra.
@@ -166,11 +171,22 @@ async function picklogRoute(req, res, url) {
   json(res, 200, await picklog()[job]());
 }
 
+// Lecturas de Betano: las manda el script lector con el secreto del seguimiento (lib/betano-read.mjs).
+async function betanoRoute(req, res, url) {
+  if (req.method !== 'POST') throw espn.httpError(405, 'Método no permitido');
+  const db = dbFromEnv();
+  if (!db || !process.env.TRACK_TICK_SECRET) throw espn.httpError(503, 'Las lecturas de Betano no están configuradas');
+  if (!sameSecret(req.headers?.['x-tick-secret'], process.env.TRACK_TICK_SECRET)) throw espn.httpError(401, 'Secreto inválido');
+  if (url.pathname !== '/api/betano/ingest') throw espn.httpError(404, 'No encontrado');
+  json(res, 200, await betanoIngest(db, (await readBody(req))?.events));
+}
+
 export async function handler(req, res) {
   const url = new URL(req.url, 'http://localhost');
   try {
     if (url.pathname.startsWith('/api/track/')) return await trackRoute(req, res, url);
     if (url.pathname.startsWith('/api/picklog/')) return await picklogRoute(req, res, url);
+    if (url.pathname.startsWith('/api/betano/')) return await betanoRoute(req, res, url);
     if (url.pathname === '/api/chat') {
       if (req.method !== 'POST') throw espn.httpError(405, 'Método no permitido');
       const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress).split(',')[0].trim();

@@ -202,6 +202,23 @@ test('Mejores apuestas: si falla un día se muestran los otros; si falla todo, e
   await assert.rejects(view.render({}, { api: fakeApi([]), leagueInfo: { id: 'colombia', title: 'Liga BetPlay' } }), /caído/);
 });
 
+test('Mejores apuestas: junto a la probabilidad, el historial del tramo; con menos de 30 picks, "muestra pequeña"', async () => {
+  const { default: view, recordText } = await import('../public/views/picks.js');
+  assert.match(String(recordText({ from: 80, n: 105, said: 0.83, hit: 0.81 })), /81\s?%.*en 105 picks/);
+  assert.equal(String(recordText({ from: 90, n: 29, said: 0.91, hit: 0.5 })), 'muestra pequeña');
+  assert.match(String(recordText({ from: 80, n: 30, said: 0.83, hit: 0.8 })), /en 30 picks/);
+  assert.equal(String(recordText(null)), '—');
+  const game = { id: 'g1', start: '2099-01-01T00:00:00Z', status: { state: 'pre' }, home: { name: 'Millonarios' }, away: { name: 'Nacional' } };
+  const picks = [{ market: 'ml', name: 'Local', p: 0.84, minOdds: 1.25, record: { from: 80, n: 105, said: 0.83, hit: 0.81 } },
+    { market: 'ou', label: 'Totales', name: 'Más', line: 2.5, p: 0.6, minOdds: 1.75, record: { from: 60, n: 22, said: 0.64, hit: 0.9 } }];
+  const el = {};
+  await view.render(el, { api: { games: async () => ({ data: [game] }), get: async (path) => (path === '/api/record' ? { data: null } : { accuracy: { publish: true }, data: [{ gameId: 'g1', picks }] }) }, leagueInfo: { id: 'colombia', title: 'Liga BetPlay' } });
+  const s = String(el.innerHTML);
+  assert.match(s, /81\s?% <small>en 105 picks<\/small>/);
+  assert.match(s, /muestra pequeña/);
+  assert.doesNotMatch(s, /90\s?%/); // el 90 % de 22 picks no se muestra
+});
+
 test('Tendencias: el rango de cuotas acepta «−» (U+2212) y «+» al inicio', async () => {
   const { americanIn } = await import('../public/views/insights.js');
   assert.equal(americanIn('−300'), -300);

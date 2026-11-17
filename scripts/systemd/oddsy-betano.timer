@@ -1,0 +1,12 @@
+# Ejemplo, sin instalar. Va junto a oddsy-betano.service en ~/.config/systemd/user/;
+# se activa con: systemctl --user enable --now oddsy-betano.timer   (ver corridas: journalctl --user -u oddsy-betano)
+[Unit]
+Description=Lee Betano para Oddsy cada hora
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=120
+Persistent=false
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,14 @@
+# Ejemplo, sin instalar. Para activarlo: copia este archivo y el .timer a ~/.config/systemd/user/, pon
+# TRACK_TICK_SECRET=... en ~/.config/oddsy-betano.env (chmod 600) y corre: systemctl --user daemon-reload && systemctl --user enable --now oddsy-betano.timer
+[Unit]
+Description=Lector de cuotas de Betano para Oddsy
+# Abre un Brave con ventana: necesita la sesión gráfica (DISPLAY o WAYLAND_DISPLAY en el entorno del usuario).
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Escritorio/oddsy-bet
+EnvironmentFile=%h/.config/oddsy-betano.env
+ExecStart=/home/camilo/.nvm/versions/node/v24.18.0/bin/node scripts/betano-reader.mjs
+# Sale con 2 si Betano corta (403, 429 o reto de Cloudflare); el timer lo vuelve a intentar en la siguiente vuelta.
+TimeoutStartSec=25min

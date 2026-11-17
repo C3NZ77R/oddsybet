@@ -7,7 +7,10 @@ import { RG_LINE } from '../shell.js';
 import { pickText } from '../picktext.js';
 const RECORD_WAIT_MS = 1500;
 const LATE = Symbol('tarde');
-const recordText = (r) => (r ? h`${fmtPct(r.hit, 0)} <small>de ${r.n}</small>` : "—");
+// record: el tramo del backtest de ese mercado ({ from, n, said, hit }, lib/markets.mjs). Con menos de RECORD_MIN_N picks
+// el porcentaje diría más de lo que la muestra sostiene.
+export const RECORD_MIN_N = 30;
+export const recordText = (r) => (!r ? '—' : r.n < RECORD_MIN_N ? 'muestra pequeña' : h`${fmtPct(r.hit, 0)} <small>en ${r.n} picks</small>`);
 const star = (p) => (p.featured ? h`<span class="pk-star" aria-label="Pick del partido">★</span> ` : '');
 
 // El porqué del pick del partido cotizado con la línea del mercado (x.mkt): qué decía el modelo solo y hacia dónde se

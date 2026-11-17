@@ -278,7 +278,7 @@ test('server: readBody acepta JSON hasta 3 MB y usa el cuerpo que ya parseó Ver
 });
 
 test('Vercel: cada carpeta anidada de api/ reexporta el handler (el catch-all de la raíz no las atrapa)', async () => {
-  for (const dir of ['tennis', 'track', 'picklog']) {
+  for (const dir of ['tennis', 'track', 'picklog', 'betano']) {
     const mod = await import(`../api/${dir}/[...path].mjs`);
     assert.equal(mod.default, handler, dir);
   }
