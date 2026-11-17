@@ -121,7 +121,9 @@ async function ensureBrave() {
   if (await up()) return null;
   const child = spawn(process.env.BRAVE_BIN ?? 'brave-browser', [`--user-data-dir=${PROFILE}`, '--remote-debugging-port=9333', '--no-first-run', '--no-default-browser-check', 'about:blank'], { detached: true, stdio: 'ignore' });
   child.unref();
-  for (let i = 0; i < 40; i++) { await wait(500); if (await up()) return child; }
+  // brave-browser es un script que lanza el binario: se mata el grupo entero (detached), no solo el script.
+  child.kill = () => { try { process.kill(-child.pid); } catch { /* ya no está */ } };
+  for (let i = 0; i < 120; i++) { await wait(500); if (await up()) return child; } // en frío tardó más de 20 s (2026-11-16)
   child.kill();
   throw new Error('Brave no abrió el puerto 9333');
 }
