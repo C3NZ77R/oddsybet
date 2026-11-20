@@ -190,7 +190,10 @@ test('mejores apuestas: una por mercado, escalera del resultado y solo la línea
   assert.equal(minOdds(0.5), 2.1);
   assert.equal(minOdds(0.8), 1.32); // 1.3125 redondeado hacia arriba: nunca por debajo de la justa + 5%
   assert.equal(minOdds(0.7), 1.5); // 105/0.7 = 150.0000…02 en coma flotante: no debe subir a 1.51
-  const ps = picksOf('soccer', marketsFor('soccer', { kind: 'poisson', lh: 2.2, la: 0.7 }));
+  // Favorito claro: sin empate (1.08) y doble oportunidad (1.05) pagan menos de MIN_ODDS y no salen; el 1X2 (1.34) sí.
+  const fav = picksOf('soccer', marketsFor('soccer', { kind: 'poisson', lh: 2.2, la: 0.7 })).map((p) => p.market);
+  assert.ok(fav.includes('1x2') && !fav.includes('dnb') && !fav.includes('dc'), String(fav));
+  const ps = picksOf('soccer', marketsFor('soccer', { kind: 'poisson', lh: 1.85, la: 1.25 }));
   const keys = ps.map((p) => p.market);
   assert.equal(new Set(keys).size, keys.length);
   for (const k of ['1x2', 'dnb', 'dc']) assert.ok(keys.includes(k), k);
@@ -338,7 +341,7 @@ test('mercados: si ESPN corta los calendarios, el error se recuerda 60 s antes d
 // ---------- mejores apuestas con lo aprendido (registro de picks) ----------
 test('mejores apuestas: sin modelo, p = raw; con uno que encoge dc, la p y la cuota mínima salen de la ajustada', async () => {
   const { picksOf, minOdds } = await import('../lib/markets.mjs');
-  const ms = marketsFor('soccer', { kind: 'poisson', lh: 2.2, la: 0.7 });
+  const ms = marketsFor('soccer', { kind: 'poisson', lh: 1.85, la: 1.25 }); // parejo: la doble oportunidad paga 1.26
   for (const p of picksOf('soccer', ms)) assert.equal(p.p, p.raw);
   const model = { sports: { soccer: { status: 'en_uso', markets: { dc: { a: 0, b: 0.5, n: 100 } } } } };
   const dc = picksOf('soccer', ms, { model, league: 'laliga', x: {} }).find((p) => p.market === 'dc');
@@ -350,12 +353,12 @@ test('mejores apuestas: sin modelo, p = raw; con uno que encoge dc, la p y la cu
 test('mejores apuestas: side es la posición en el mercado completo, aunque publishable quite una doble oportunidad', async () => {
   const { picksOf } = await import('../lib/markets.mjs');
   const { publishable } = await import('../lib/pricing.mjs');
-  const ms = publishable(marketsFor('soccer', { kind: 'poisson', lh: 3.5, la: 0.3 }));
+  const ms = publishable(marketsFor('soccer', { kind: 'poisson', lh: 1.2, la: 0.15 })); // "Local o visitante" paga 1.34
   assert.ok(!pick(ms, 'dc').selections.some((s) => s.name === 'Local o empate')); // sobre MAX_P: fuera
   const dc = picksOf('soccer', ms).find((p) => p.market === 'dc');
   assert.equal(dc.name, 'Local o visitante');
   assert.equal(dc.side, 1);
-  const away = picksOf('soccer', marketsFor('soccer', { kind: 'poisson', lh: 0.5, la: 2.5 })).find((p) => p.market === '1x2');
+  const away = picksOf('soccer', marketsFor('soccer', { kind: 'poisson', lh: 0.9, la: 1.9 })).find((p) => p.market === '1x2');
   assert.equal(away.name, 'Visitante');
   assert.equal(away.side, 2);
 });
@@ -374,7 +377,7 @@ test('mejores apuestas: getPicks marca como pick del partido la de mayor probabi
   await withEspn(leagueRoute('conmebol.libertadores', events, [g]), async () => {
     const plain = (await getPicks('libertadores', { date: '20260411' })).data[0];
     assert.deepEqual(plain.x, { few: 1, abs: 0 }); // en pre, contra hoy: el último partido de la liga fue hace meses
-    for (const c of [1, -1]) {
+    for (const c of [1, -0.3]) { // con −1 ningún pick de 1.25 o más queda sobre 50 % y el partido sale sin ★
       const { picks } = (await getPicks('libertadores', { date: '20260411', model: shift(c) })).data[0];
       assert.equal(Boolean(picks[0].featured), picks[0].p >= FEATURED_MIN, `c = ${c}: ${picks[0].p}`);
       assert.ok(picks[0].p >= FEATURED_MIN, 'el partido tiene pick del partido'); // un partido con apuestas visibles nunca queda sin ★

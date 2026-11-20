@@ -153,7 +153,7 @@ test('picksOf: la ventaja, value y suspect salen de la p final (con lo aprendido
   // Cruda: 0.6 × 2.2 − 1 = 0.32, sospechosa. Lo aprendido baja la p y con ella la ventaja.
   const markets = [
     { key: 'btts', label: 'Ambos marcan', selections: [{ name: 'Sí', p: 0.6, fair: 1.67, betano: 2.2, edge: 0.32, suspect: true }, { name: 'No', p: 0.4, fair: 2.5, betano: 1.6, edge: -0.36 }] },
-    { key: 'dnb', label: 'Sin empate', selections: [{ name: 'Local', p: 0.55, fair: 1.82 }, { name: 'Visitante', p: 0.45, fair: 2.22 }] },
+    { key: 'dnb', label: 'Sin empate', selections: [{ name: 'Local', p: 0.55, fair: 1.82, oddsy: 1.73 }, { name: 'Visitante', p: 0.45, fair: 2.22, oddsy: 2.11 }] },
   ];
   const of = (model) => picksOf('soccer', markets, { model, league: 'laliga' });
   const [raw] = of(null);
@@ -166,6 +166,12 @@ test('picksOf: la ventaja, value y suspect salen de la p final (con lo aprendido
   assert.deepEqual([low.edge, low.value], [low.p * 2.2 - 1, false]);
   const dnb = some.find((p) => p.market === 'dnb');
   assert.ok(!('betano' in dnb) && !('edge' in dnb) && !('value' in dnb), 'sin cuota de Betano, sin campos');
+});
+
+test('picksOf: no sale una predicción que pague menos de 1.25; manda la cuota de Betano y, sin lectura, la del modelo', () => {
+  const m = (key, s) => ({ key, label: key, selections: [{ name: 'Local', p: 0.8, fair: 1.25, ...s }, { name: 'Visitante', p: 0.2, fair: 5 }] });
+  const markets = [m('1x2', { oddsy: 1.24 }), m('dnb', { oddsy: 1.25 }), m('btts', { oddsy: 1.19, betano: 1.3 }), m('ou', { oddsy: 1.3, betano: 1.24 })];
+  assert.deepEqual(picksOf('soccer', markets).map((p) => p.market), ['dnb', 'btts']);
 });
 
 test('getPicks: el destacado no es un sospechoso; uno que Betano paga menos de lo justo sí, marcado sin valor', async () => {
