@@ -457,3 +457,18 @@ test('Mejores apuestas: con cuota de Betano, la ventaja con signo; "sin valor" s
   assert.match(s, /<b>1\.25<\/b><small class="">Betano 1\.10 · -8 % · sin valor<\/small>/);
   assert.match(s, /<td><b>1\.75<\/b><\/td>/); // el pick sin cuota de Betano queda como antes
 });
+
+test('Mejores apuestas: los errores de cuota de Betano van arriba, de mayor a menor ventaja; con lectura y sin ninguno se dice; sin lectura, nada', async () => {
+  const { default: view, valueHtml } = await import('../public/views/picks.js');
+  assert.equal(String(valueHtml([], false)), '');
+  assert.match(String(valueHtml([], true)), /Errores de cuota en Betano.*ninguna cuota de Betano se sale/s);
+  const game = (id, home) => ({ id, start: '2099-01-01T00:00:00Z', status: { state: 'pre' }, home: { name: home }, away: { name: 'Nacional' } });
+  const v = (edge, betano) => ({ market: '1x2', name: 'Empate', p: 0.25, minOdds: 4.2, betano, edge, value: true });
+  const data = [{ gameId: 'g1', picks: [], value: [v(0.06, 4.24)] }, { gameId: 'g2', picks: [], value: [v(0.12, 4.48)] }, { gameId: 'ya-empezó', picks: [], value: [v(0.2, 4.8)] }];
+  const el = {};
+  await view.render(el, { api: { games: async () => ({ data: [game('g1', 'Millonarios'), game('g2', 'Junior')] }), get: async (path) => (path === '/api/record' ? { data: null } : { accuracy: { publish: true }, data }) }, leagueInfo: { id: 'colombia', title: 'Liga BetPlay' } });
+  const s = String(el.innerHTML);
+  assert.match(s, /<td>Empate<br><small>Junior vs Nacional · [^<]*<\/small><\/td><td>25%<\/td><td>4\.20<\/td><td><b>4\.48<\/b> <small class="pos">\+12 %<\/small><\/td>/);
+  assert.ok(s.indexOf('Junior vs Nacional') < s.indexOf('Millonarios vs Nacional'), 'la de más ventaja primero');
+  assert.doesNotMatch(s, /4\.80/); // un partido que no está por jugar no cuenta
+});

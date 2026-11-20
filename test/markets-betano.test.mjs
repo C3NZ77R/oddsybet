@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getMarkets, getPicks, freshness, picksOf } from '../lib/markets.mjs';
+import { getMarkets, getPicks, freshness, picksOf, valueOf, MIN_ODDS } from '../lib/markets.mjs';
 
 const H = 3_600_000;
 const pick = (ms, key) => ms.filter((m) => m.key === key);
@@ -101,6 +101,9 @@ test('fútbol: con lectura fresca solo las líneas de goles leídas, con cuota d
     const src = sel(pick(g.markets, 'ou').find((m) => m.label === ou.label), ou.name);
     assert.deepEqual([ou.betano, ou.edge, ou.suspect], [src.betano, src.edge, src.suspect]);
     assert.ok(p0.data[0].picks.every((p) => !('betano' in p) && !('edge' in p) && !('suspect' in p)));
+    // Con lectura, el partido trae además sus errores de cuota (valueOf); sin ella, ni el campo.
+    assert.equal('value' in p0.data[0], false);
+    assert.deepEqual(p1.data[0].value, valueOf('soccer', g.markets, { league: 'laliga', x: p1.data[0].x }));
   });
 });
 
@@ -172,6 +175,24 @@ test('picksOf: no sale una predicción que pague menos de 1.25; manda la cuota d
   const m = (key, s) => ({ key, label: key, selections: [{ name: 'Local', p: 0.8, fair: 1.25, ...s }, { name: 'Visitante', p: 0.2, fair: 5 }] });
   const markets = [m('1x2', { oddsy: 1.24 }), m('dnb', { oddsy: 1.25 }), m('btts', { oddsy: 1.19, betano: 1.3 }), m('ou', { oddsy: 1.3, betano: 1.24 })];
   assert.deepEqual(picksOf('soccer', markets).map((p) => p.market), ['dnb', 'btts']);
+});
+
+test('valueOf: errores de cuota en cualquier selección y línea, de mayor a menor ventaja; fuera lo sospechoso, lo que paga menos de 1.25 y lo que no llega a la cuota mínima', () => {
+  const s = (name, p, betano) => ({ name, p, fair: +(1 / p).toFixed(2), ...(betano && { betano }) });
+  const ou = (line, over, under) => ({ key: 'ou', label: `Total de goles ${line}`, selections: [{ ...over, line }, { ...under, line }] });
+  const markets = [
+    // Favorito a 1.60 (mínima 1.75): no. Empate a 4.50 (mínima 4.20): sí. Visitante a 9.00: +35 %, sospechoso.
+    { key: '1x2', label: 'Resultado', selections: [s('Local', 0.6, 1.6), s('Empate', 0.25, 4.5), s('Visitante', 0.15, 9)] },
+    ou(1.5, s('Más', 0.9, 1.2), s('Menos', 0.1)), // 1.20 supera su mínima (1.17) pero paga menos de 1.25
+    ou(2.5, s('Más', 0.45, 2.4), s('Menos', 0.55, 1.6)), // una línea que no es la principal también cuenta
+    { key: 'ah', label: 'Hándicap asiático', selections: [s('Local', 0.5, 2.4), s('Visitante', 0.5, 1.6)] }, // mercado que no se publica
+  ];
+  const mkt = { x: { mkt: 1 } };
+  const found = valueOf('soccer', markets, mkt);
+  assert.deepEqual(valueOf('soccer', markets), [], 'sin línea del mercado no se busca: contra el modelo solo casi todo sería error nuestro');
+  assert.deepEqual(found.map((p) => [p.market, p.name, p.line, p.side]), [['1x2', 'Empate', null, 1], ['ou', 'Más', 2.5, 0]]);
+  assert.ok(found.every((p) => p.value && p.betano >= p.minOdds && p.betano >= MIN_ODDS));
+  assert.deepEqual(valueOf('soccer', markets.map((m) => ({ ...m, selections: m.selections.map(({ betano, ...rest }) => rest) })), mkt), [], 'sin cuotas de Betano no hay nada que comparar');
 });
 
 test('getPicks: el destacado no es un sospechoso; uno que Betano paga menos de lo justo sí, marcado sin valor', async () => {

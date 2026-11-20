@@ -44,6 +44,18 @@ function gameCard(g, picks, x) {
     </table>${picks.some((p) => p.featured) ? h`<p class="hint">★ Mejor predicción del partido, la que cuenta en el registro de Oddsy.</p>` : ''}</section>`;
 }
 
+// Errores de cuota (value de /api/picks): rows = [[partido, selección]], de mayor a menor ventaja. read: hubo lectura
+// fresca de Betano; con ella y sin filas se dice que no hay ninguno, y sin lectura no sale nada.
+export function valueHtml(rows, read) {
+  if (!rows.length && !read) return '';
+  return h`<section class="card pk-value"><h2>Errores de cuota en Betano</h2>${!rows.length ? h`<p class="hint">Ahora ninguna cuota de Betano se sale de la línea del mercado.</p>`
+    : h`<p class="hint">Betano paga la cuota mínima o más en partidos cotizados con la línea del mercado: su precio se sale de ella. Revisa la cuota en Betano antes de apostar, porque puede haber cambiado.</p>
+    <table class="tbl"><caption class="sr-only">Apuestas que Betano paga por encima de la cuota mínima</caption>
+      <thead><tr><th scope="col">Apuesta</th><th scope="col">Probabilidad</th><th scope="col">Cuota mínima</th><th scope="col">Betano</th></tr></thead>
+      <tbody>${rows.map(([g, p]) => h`<tr><td>${pickText(p, g)}<br><small>${g.home?.name} vs ${g.away?.name} · ${when(g.start)}</small></td><td>${fmtPct(p.p, 0)}</td><td>${fmtOdds(p.minOdds)}</td><td><b>${fmtOdds(p.betano)}</b> <small class="pos">+${Math.round(p.edge * 100)} %</small></td></tr>`)}</tbody>
+    </table>`}</section>`;
+}
+
 // ---------- registro de Oddsy ----------
 const MARKET_NAMES = { '1x2': 'Resultado', dc: 'Doble oportunidad', dnb: 'Empate no válido', ou: 'Totales', btts: 'Ambos marcan', ml: 'Ganador', spread: 'Hándicap',
   games_hcp: 'Hándicap de games', first_set: 'Primer set', ou_sets: 'Total de sets', ou_games: 'Total de games', ou_set1: 'Games del 1er set' };
@@ -112,10 +124,12 @@ export default {
     // Llegan también los picks que lo aprendido dejó bajo el 50 % (el registro los guarda); aquí no se muestran.
     const rows = res.flatMap(([, pk]) => pk.data ?? []).map((x) => [games.get(x.gameId), x.picks.filter((p) => p.p >= 0.5), x.x])
       .filter(([g, ps]) => g?.status?.state === 'pre' && ps.length).sort(([a], [b]) => a.start.localeCompare(b.start));
+    const pre = res.flatMap(([, pk]) => pk.data ?? []).map((x) => [games.get(x.gameId), x]).filter(([g]) => g?.status?.state === 'pre');
+    const value = pre.flatMap(([g, x]) => (x.value ?? []).map((p) => [g, p])).sort(([, a], [, b]) => b.edge - a.edge);
     el.innerHTML = h`<div data-record>${recordHtml(record)}</div><header class="view-head"><div><h1>Mejores apuestas · ${lg.title}</h1>
       <p class="hint">Apuesta solo si tu casa paga <b>la cuota mínima o más</b>. Donde hay línea del mercado, la probabilidad parte de ella: en el backtest acierta más que el modelo solo.</p></div></header>
       ${acc?.publish === false ? empty('Aún no mostramos apuestas en esta liga: Oddsy todavía no supera a los resultados de la temporada pasada.')
-        : rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps, x]) => gameCard(g, ps, x))}` : empty('No hay partidos próximos con apuestas de al menos 50%.')}`;
+        : h`${valueHtml(value, pre.some(([, x]) => x.betano?.fresh))}${rows.length ? h`<p><button type="button" class="btn" data-wa>Compartir picks por WhatsApp</button></p>${rows.map(([g, ps, x]) => gameCard(g, ps, x))}` : empty('No hay partidos próximos con apuestas de al menos 50%.')}`}`;
     el.querySelector?.('[data-wa]')?.addEventListener('click', () => window.open(`https://wa.me/?text=${encodeURIComponent(dayText(lg.title, rows, 8, record, `${location.origin}${location.pathname}#/${lg.id}/picks`))}`, '_blank', 'noopener'));
     // Si se cambió de vista mientras tanto, el hueco ya no está en la página y no se toca nada.
     if (first === LATE) recordP.then((rec) => {
