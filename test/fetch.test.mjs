@@ -58,6 +58,7 @@ test('fetchJson: si ESPN falla al renovar, sirve la última respuesta buena y re
   await new Promise((r) => setTimeout(r, 5));
   assert.deepEqual(await fetchJson(url, 1), { n: 1 }); // la renovación falló: copia vieja
   assert.equal(calls.length, 2);
+  await new Promise((r) => setTimeout(r, 5)); // pasada la vigencia de 1 ms que pide quien llama: manda la ventana de reintento
   assert.deepEqual(await fetchJson(url, 1), { n: 1 }); // dentro de la ventana de reintento no vuelve a pedir
   assert.equal(calls.length, 2);
 }));
