@@ -63,7 +63,7 @@ const MARK = { ganada: ['✓', 'Ganada'], perdida: ['✗', 'Perdida'], nula: ['�
 const fmtDay = (d) => new Date(`${d}T12:00:00-05:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', timeZone: 'America/Bogota' }).replace('.', '');
 const closedOf = (picks) => picks.filter((p) => p.status === 'ganada' || p.status === 'perdida');
 const dayTitle = (day) => `${day.yesterday ? 'Ayer' : fmtDay(day.date)} · ${closedOf(day.picks).filter((p) => p.status === 'ganada').length} de ${closedOf(day.picks).length}`;
-const totalLine = (label, w) => (w && w.won + w.lost ? h`<li>${label}: <b>${w.won} de ${w.won + w.lost}</b> (${fmtPct(w.hit, 0)}) · Oddsy prometía ${fmtPct(w.promised, 0)}</li>` : '');
+const totalLine = (label, w) => (w && w.won + w.lost ? h`<li>${label}: <b>${w.won} de ${w.won + w.lost}</b> (${fmtPct(w.hit, 0)}) · Oddsy prometía ${fmtPct(w.promised, 0)}${w.clvN >= 10 ? ` · cuota ${w.clv >= 0 ? 'mejor' : 'peor'} que la de cierre por ${fmtPct(Math.abs(w.clv), 1)} (${w.clvN} picks)` : ''}</li>` : '');
 
 function learnText(m) {
   if (!m) return '';

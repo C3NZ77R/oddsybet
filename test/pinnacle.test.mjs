@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pinnacleLine, pinnacleLines, _reset } from '../lib/pinnacle.mjs';
+import { pinnacleLine, pinnacleLines, consensusLine, _reset } from '../lib/pinnacle.mjs';
 import { marketsFor } from '../lib/markets.mjs';
 import { overOf, gamesOf, gameFor } from '../public/betano.js';
 
@@ -70,4 +70,42 @@ test('marketsFor cotiza el básquet en las líneas de la casa y overOf las saca 
   assert.deepEqual(overOf(gameFor({ games: bt }, d('Indiana Pacers', 'Washington Wizards'))), { spread: -2.5, total: 228.5 });
   assert.deepEqual(overOf(gameFor({ games: bt }, d('Washington Wizards', 'Indiana Pacers'))), { spread: 2.5, total: 228.5 }); // al revés
   assert.equal(overOf(null), null);
+});
+
+// Una casa de dos lados (básquet) con ganador, hándicap y total.
+const book = (key, [h, a], spread, total) => ({ key, markets: [
+  { key: 'h2h', outcomes: [out('Los Angeles Clippers', h), out('Indiana Pacers', a)] },
+  ...(spread ? [{ key: 'spreads', outcomes: [out('Los Angeles Clippers', spread[1], spread[0]), out('Indiana Pacers', spread[2], -spread[0])] }] : []),
+  ...(total ? [{ key: 'totals', outcomes: [out('Over', total[1], total[0]), out('Under', total[2], total[0])] }] : []),
+] });
+const ev = (...bookmakers) => ({ ...NBA, bookmakers });
+
+test('consensusLine: mediana de las casas distintas, los clones cuentan una vez', () => {
+  const pin = book('pinnacle', [1.8, 2.05], [-2.5, 1.95, 1.95], [228.5, 1.9, 1.95]);
+  const a = book('a', [1.7, 2.2], [-2.5, 1.9, 2.0], [228.5, 1.95, 1.9]);
+  const b = book('b', [1.6, 2.4], [-3.5, 1.9, 1.9], [228.5, 2.0, 1.85]); // otro hándicap: no entra en la mediana del hándicap
+  const c = consensusLine(ev(pin, a, b, { ...b, key: 'clon-de-b' }));
+  const p = (h, x) => (1 / h) / (1 / h + 1 / x);
+  assert.ok(Math.abs(c.ml[0] - p(1.7, 2.2)) < 1e-9); // mediana de tres, no de cuatro
+  assert.ok(Math.abs(c.ml[0] + c.ml[1] - 1) < 1e-12);
+  assert.equal(c.spread.line, -2.5);
+  assert.ok(Math.abs(c.spread.p - 0.5) < 1e-9); // solo dos casas en -2.5: queda la de Pinnacle
+  assert.equal(c.total.line, 228.5);
+  assert.ok(Math.abs(c.total.p - p(1.95, 1.9)) < 1e-9);
+});
+
+test('consensusLine: con menos de 3 precios distintos queda Pinnacle; sin Pinnacle, nada', () => {
+  const pin = book('pinnacle', [1.8, 2.05]);
+  assert.deepEqual(consensusLine(ev(pin, book('a', [1.7, 2.2]))), pinnacleLine(ev(pin)));
+  assert.deepEqual(consensusLine(ev(pin, { ...pin, key: 'x' }, { ...pin, key: 'y' })), pinnacleLine(ev(pin))); // tres marcas, un precio
+  assert.equal(consensusLine(ev(book('a', [1.7, 2.2]), book('b', [1.6, 2.4]), book('c', [1.5, 2.6]))), null);
+  assert.equal(consensusLine(null), null);
+});
+
+test('consensusLine: 1X2 de tres salidas suma 1', () => {
+  const soc = (key, f, c, d) => ({ key, markets: [{ key: 'h2h', outcomes: [out('Fulham', f), out('Manchester City', c), out('Draw', d)] }] });
+  const c = consensusLine({ ...CITY, bookmakers: [soc('pinnacle', 6.61, 1.43, 5.18), soc('a', 7, 1.4, 5), soc('b', 6, 1.45, 5.5)] });
+  assert.equal(c.ml.length, 3);
+  assert.ok(Math.abs(c.ml.reduce((s, x) => s + x, 0) - 1) < 1e-12);
+  assert.ok(c.ml[0] > 0.65 && c.ml[0] < 0.7);
 });

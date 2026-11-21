@@ -2,7 +2,7 @@
 // registro público. Base y ESPN falsos en memoria: sin red.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gradePick, reasonOf, scoreOf, runTick, runLearn, recordOf, dayOf, sameSecret, staleReads, BACKFILL_DAYS, BACKFILL_STEPS } from '../lib/picklog.mjs';
+import { closeOf, gradePick, reasonOf, scoreOf, runTick, runLearn, recordOf, dayOf, sameSecret, staleReads, BACKFILL_DAYS, BACKFILL_STEPS } from '../lib/picklog.mjs';
 import { LEAGUES } from '../public/leagues.js';
 
 const soc = (market, side, line, home, away, name = 'STATUS_FULL_TIME') => gradePick({ sport: 'soccer', market, side, line }, { home, away, name });
@@ -293,4 +293,64 @@ test('staleReads: avisa con partidos de hoy por jugar y la última lectura de ha
   } finally { console.warn = real; }
   assert.equal(seen.length, 1);
   assert.match(seen[0], /^betano-alerta: 1 partidos de hoy por jugar y la última lectura es de hace 9 h$/);
+});
+
+// ---------- valor contra el cierre ----------
+const START = NOW - 3 * 3_600_000;
+const H = 3_600_000;
+// Una fila de betano_history: la cuota que rige desde readMs.
+const hist = (ml, readMs, extra = {}) => ({ key: 'k', readAt: new Date(readMs).toISOString(), game: { t: START, teams: ['Local a', 'Visita a'], ml, ...extra } });
+const closeRow = { sport: 'soccer', gameStart: new Date(START).toISOString(), home: 'Local a', away: 'Visita a', market: '1x2', name: 'Local', side: 0, line: null };
+
+test('closeOf: la cuota que regía al entrar el pick al registro (3 h antes) contra la de cierre', () => {
+  const h = [hist([2.0, 3.4, 3.9], START - 5 * H), hist([1.9, 3.4, 4.1], START - 2 * H), hist([1.8, 3.5, 4.4], START - 0.2 * H)];
+  assert.deepEqual(closeOf(closeRow, h), { take: 2.0, close: 1.8 });
+  assert.deepEqual(closeOf({ ...closeRow, name: 'Visitante', side: 2 }, h), { take: 3.9, close: 4.4 });
+  assert.equal(closeOf(closeRow, h.slice(1)), null); // sin lectura de 3 h antes: no se sabe a cuánto entró
+  assert.equal(closeOf({ ...closeRow, home: 'Otro equipo' }, h), null);
+  assert.equal(closeOf(closeRow, []), null);
+  // La hora de la base viene como +00:00: se compara como fecha, no como texto.
+  assert.deepEqual(closeOf({ ...closeRow, gameStart: new Date(START).toISOString().replace('.000Z', '+00:00') }, h), { take: 2.0, close: 1.8 });
+});
+
+test('closeOf: en tenis el pick guarda el nombre del jugador y Betano se lee por lado', () => {
+  const t = (s1, readMs) => ({ key: 't', readAt: new Date(readMs).toISOString(), game: { t: START, teams: ['Sinner J.', 'Alcaraz C.'], ml: [1.9, 1.9], s1, ou: [] } });
+  const row = { sport: 'tennis', gameStart: new Date(START).toISOString(), home: 'Jannik Sinner', away: 'Carlos Alcaraz', market: 'first_set', name: 'C. Alcaraz', side: 1, line: null };
+  assert.deepEqual(closeOf(row, [t([1.8, 2.0], START - 4 * H), t([1.7, 2.1], START - H)]), { take: 2.0, close: 2.1 });
+});
+
+test('tick: al cerrar un pick con cuota de Betano guarda el cierre y el CLV; sin historial o sin cuota, null', async () => {
+  const db = memDb(done);
+  const base = { source: 'live', league: 'colombia', sport: 'soccer', espnDate: TODAY, status: 'pendiente', x: {}, gameStart: new Date(START).toISOString(), market: '1x2', name: 'Local', side: 0, line: null, p: 0.6, closeOdds: null, clv: null };
+  await db.upsertPicks([
+    { ...base, id: 'colombia:a:1x2', gameId: 'a', home: 'Local a', away: 'Visita a', betanoOdds: 1.8 },
+    { ...base, id: 'colombia:b:1x2', gameId: 'b', home: 'Rojo', away: 'Azul', betanoOdds: 2.0 },
+    { ...base, id: 'colombia:c:1x2', gameId: 'c', home: 'Local a', away: 'Visita a', betanoOdds: null },
+  ]);
+  const asked = [];
+  db.betanoCloses = async (from, to, before) => { asked.push([from, to, before]); return [hist([2.0, 3.4, 3.9], START - 5 * H), hist([1.8, 3.5, 4.4], START - 0.2 * H)]; };
+  const r = { home: 2, away: 1, name: 'STATUS_FULL_TIME' };
+  await runTick(deps(db, { results: { [TODAY]: { a: r, b: r, c: r } } }), { now: NOW });
+  const g = (id) => db.rows.get(id);
+  // Tomada a 2.00 tres horas antes, cerró en 1.80: +11.1 %, aunque la última foto del pick ya fuera 1.80.
+  assert.deepEqual([g('colombia:a:1x2').status, g('colombia:a:1x2').closeOdds, g('colombia:a:1x2').clv], ['ganada', 1.8, 0.1111]);
+  assert.deepEqual([g('colombia:b:1x2').closeOdds, g('colombia:b:1x2').clv], [null, null]);
+  assert.deepEqual([g('colombia:c:1x2').closeOdds, g('colombia:c:1x2').clv], [null, null]);
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0][2], new Date(START).toISOString()); // solo lecturas previas al inicio
+});
+
+test('tick: si el historial falla, el pick se cierra igual sin CLV', async () => {
+  const db = memDb(done);
+  await db.upsertPicks([{ id: 'colombia:a:1x2', source: 'live', league: 'colombia', sport: 'soccer', espnDate: TODAY, status: 'pendiente', x: {}, gameId: 'a', gameStart: new Date(START).toISOString(), market: '1x2', name: 'Local', side: 0, line: null, p: 0.6, home: 'Local a', away: 'Visita a', betanoOdds: 2.0, closeOdds: null, clv: null }]);
+  db.betanoCloses = async () => { throw new Error('caída'); };
+  await runTick(deps(db, { results: { [TODAY]: { a: { home: 2, away: 1, name: 'STATUS_FULL_TIME' } } } }), { now: NOW });
+  assert.deepEqual([db.rows.get('colombia:a:1x2').status, db.rows.get('colombia:a:1x2').clv], ['ganada', null]);
+});
+
+test('recordOf: CLV medio de los picks con cierre', () => {
+  const row = (id, clv) => ({ id, source: 'live', league: 'colombia', featured: true, status: 'ganada', p: 0.7, market: 'dc', gameStart: new Date(NOW - 86_400_000).toISOString(), clv });
+  const rec = recordOf([row('1', 0.1), row('2', -0.02), row('3', null)], null, 'colombia', NOW);
+  assert.deepEqual([rec.all.clv, rec.all.clvN], [0.04, 2]);
+  assert.deepEqual([recordOf([row('1', null)], null, 'colombia', NOW).all.clv, recordOf([row('1', null)], null, 'colombia', NOW).all.clvN], [null, 0]);
 });

@@ -18,6 +18,10 @@ function fakeDb() {
     reads: 0,
     fail: false,
     async saveBetanoReads(list) { for (const r of list) rows.set(r.key, r); },
+    history: [], // betano_history: solo inserta
+    async saveBetanoHistory(list) { this.history.push(...list); },
+    // Como Postgres devuelve un jsonb: con las claves en otro orden.
+    async betanoReadGames(keys) { return keys.filter((k) => rows.has(k)).map((k) => ({ key: k, game: Object.fromEntries(Object.entries(rows.get(k).game).reverse()) })); },
     async betanoReads(from, to) {
       this.reads++;
       if (this.fail) throw new Error('caída');
@@ -129,9 +133,35 @@ test('POST /api/betano/ingest con el secreto bueno hace el upsert en betano_read
       assert.deepEqual(r, { status: 200, body: { saved: 1 } });
     });
   } finally { globalThis.fetch = real; }
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'https://falsa.supabase.test/rest/v1/betano_read?on_conflict=key');
+  assert.equal(calls.length, 3);
+  assert.match(calls[0].url, /\/rest\/v1\/betano_read\?key=in\.\("[0-9a-z%C]+"\)&select=key,game$/);
+  assert.equal(calls[2].url, 'https://falsa.supabase.test/rest/v1/betano_history');
+  assert.deepEqual(Object.keys(JSON.parse(calls[2].init.body)[0]).sort(), ['game', 'key', 'read_at', 'start_at']);
+  calls.splice(0, 1);
   assert.equal(calls[0].init.headers.prefer, 'resolution=merge-duplicates');
   const [row] = JSON.parse(calls[0].init.body);
   assert.deepEqual(Object.keys(row).sort(), ['game', 'key', 'read_at', 'start_at', 'team1', 'team2']);
+});
+
+test('ingest guarda el historial solo cuando cambia la cuota, y solo antes del inicio', async () => {
+  const db = fakeDb();
+  const now = T - 5 * HOUR;
+  await ingest(db, [ev('Manchester City - Fulham', T)], { now });
+  await ingest(db, [ev('Manchester City - Fulham', T)], { now: now + HOUR }); // misma cuota (el jsonb vuelve en otro orden): no suma fila
+  assert.equal(db.history.length, 1);
+  assert.equal(db.history[0].readAt, new Date(now).toISOString()); // desde cuándo rige esa cuota
+  await ingest(db, [ev('Manchester City - Fulham', T, [1.5, 4.5, 6.2])], { now: now + 2 * HOUR });
+  await ingest(db, [ev('Manchester City - Fulham', T)], { now: now + 3 * HOUR }); // vuelve a la primera: cuenta como cambio
+  assert.equal(db.history.length, 3);
+  await ingest(db, [ev('Manchester City - Fulham', T, [1.2, 6, 12])], { now: T + HOUR }); // ya en juego: no es historial previo
+  assert.equal(db.history.length, 3);
+  assert.equal(db.rows.size, 1);
+  assert.deepEqual(Object.keys(db.history[0]).sort(), ['game', 'key', 'readAt', 'startAt']);
+});
+
+test('si el historial falla, la lectura se guarda igual', async () => {
+  const db = fakeDb();
+  db.betanoReadGames = async () => { throw new Error('sin tabla'); };
+  assert.deepEqual(await ingest(db, [ev('Manchester City - Fulham', T)], { now: T - HOUR }), { saved: 1 });
+  assert.equal(db.rows.size, 1);
 });
