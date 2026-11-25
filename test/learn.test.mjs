@@ -113,6 +113,17 @@ test('currentModel: sin base → null; guarda en memoria 10 min; ante error o ba
   assert.deepEqual(await currentModel({ db, now: NOW + 22 * 60_000 }), good);
 });
 
+test('currentModel: dos visitas a la vez en una instancia nueva esperan la misma carga (ninguna recibe null)', async () => {
+  const good = learnModel({ soccer: rows(50) }, { now: NOW });
+  let calls = 0, release;
+  const db = { latestModel: () => (calls++, new Promise((ok) => { release = () => ok(good); })) };
+  const at = NOW + 60 * 60_000; // fuera de la ventana de 10 min de la prueba anterior
+  const a = currentModel({ db, now: at }), b = currentModel({ db, now: at + 50 });
+  release();
+  assert.deepEqual(await Promise.all([a, b]), [good, good]);
+  assert.equal(calls, 1);
+});
+
 test('fitSport: aprende el sesgo de un lado (el Menos sale más de lo prometido y el Más menos) y lo aplica por lado', async () => {
   const { sideSign } = await import('../lib/learn.mjs');
   assert.deepEqual([sideSign('ou_games', 0), sideSign('ou_games', 1), sideSign('1x2', 1), sideSign('1x2', 2), sideSign('dc', 0)], [1, -1, 0, -1, 1]);

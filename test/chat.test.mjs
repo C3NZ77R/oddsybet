@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chat, parseBody, rateOk, SYSTEM } from '../lib/chat.mjs';
+import { outgoing } from '../public/chat.js';
 
 const ok = (text) => async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }) });
 
@@ -99,4 +100,15 @@ test('el prompt fija el umbral de segura y la regla de la cuota justa', () => {
   assert.match(SYSTEM, /cuota justa ronda fair/);
   assert.match(SYSTEM, /copia el campo verdict/);
   assert.match(SYSTEM, /nunca inventes partidos/);
+});
+
+test('outgoing: solo los últimos 12 mensajes, de 1000 caracteres, sin los fallidos; un historial largo no pasa el tope', () => {
+  const long = Array.from({ length: 20 }, (_, i) => ({ role: i % 2 ? 'model' : 'user', text: 'x'.repeat(3000) }));
+  const out = outgoing(long);
+  assert.equal(out.length, 12);
+  assert.ok(out.every((m) => m.text.length === 1000));
+  assert.ok(JSON.stringify({ messages: out }).length < 20_000); // el tope de /api/chat en server.mjs
+  const failed = [{ role: 'user', text: 'hola' }, { role: 'model', text: 'Hola' }, { role: 'user', text: 'otra', error: true },
+    { role: 'model', text: 'Mensaje muy largo', error: true }, { role: 'user', text: 'de nuevo' }];
+  assert.deepEqual(outgoing(failed).map((m) => m.text), ['hola', 'Hola', 'de nuevo']);
 });

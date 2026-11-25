@@ -211,3 +211,11 @@ test('getLiveGame: no sirve el summary que getEvent dejó 5 min en caché para u
     assert.equal(urls.length, 2); // 16 s: el seguimiento pidió 15 s y la entrada de 5 min no le sirve
   } finally { globalThis.fetch = real; Date.now = now; }
 });
+
+test('normEvent: penales con prórroga (reloj en 120\') o directos (~99\'); aet solo en STATUS_FINAL_PEN', () => {
+  const ev = (name, clock) => ({ id: '1', status: { clock, period: 5, type: { name, state: 'post' } }, competitions: [{ date: '2025-08-19T00:00Z', competitors: [] }] });
+  assert.equal(e.normEvent(ev('STATUS_FINAL_PEN', 7200), 'ucl').status.aet, true); // PSG en Liverpool, 2025-03-11
+  assert.equal(e.normEvent(ev('STATUS_FINAL_PEN', 5940), 'libertadores').status.aet, false); // Nacional en São Paulo, 2025-08-19
+  assert.equal(e.normEvent(ev('STATUS_FINAL_PEN'), 'libertadores').status.aet, null);
+  assert.equal('aet' in e.normEvent(ev('STATUS_FULL_TIME', 5400), 'laliga').status, false);
+});

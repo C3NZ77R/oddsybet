@@ -5,6 +5,10 @@ const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) ?? []; }
 const save = (m) => { try { localStorage.setItem(KEY, JSON.stringify(m.slice(-20))); } catch { /* sin almacenamiento: queda en memoria */ } };
 const el = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls ?? '', textContent: text ?? '' });
 
+// Lo que viaja a /api/chat: los últimos 12 mensajes, recortados como en parseBody (lib/chat.mjs), sin los fallidos.
+// Mandar todo el historial pasaba el tope de 20 000 caracteres del servidor y el chat quedaba en 413 para siempre.
+export const outgoing = (msgs) => msgs.filter((m) => !m.error).slice(-12).map((m) => ({ role: m.role, text: String(m.text ?? '').slice(0, 1000) }));
+
 export function initChat() {
   let msgs = load(), busy = false;
   const fab = el('button', 'chat-fab'); fab.type = 'button'; fab.setAttribute('aria-controls', 'chat'); fab.setAttribute('aria-expanded', 'false'); fab.setAttribute('aria-label', 'Asistente de IA');
@@ -34,19 +38,21 @@ export function initChat() {
   async function ask(text) {
     if (busy) return;
     busy = true; send.disabled = true;
-    msgs.push({ role: 'user', text });
+    const mine = { role: 'user', text };
+    msgs.push(mine);
     draw();
     const wait = el('div', 'chat-msg model', 'Pensando…'); log.append(wait); log.scrollTop = log.scrollHeight;
     try {
       const res = await fetch('/api/chat', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ messages: msgs, page: `${document.title} (${location.hash})` }),
+        body: JSON.stringify({ messages: outgoing(msgs), page: `${document.title} (${location.hash})` }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || 'El asistente no respondió.');
       msgs.push({ role: 'model', text: body.reply });
     } catch (err) {
-      msgs.push({ role: 'model', text: err.message });
+      mine.error = true; // se ve en el chat pero no se reenvía: Gemini no debe leer el error como respuesta suya
+      msgs.push({ role: 'model', text: err.message, error: true });
     }
     save(msgs); busy = false; send.disabled = false; draw();
   }

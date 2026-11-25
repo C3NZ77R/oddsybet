@@ -47,6 +47,11 @@ test('gradePick: básquet y tenis; devueltas, aplazados, prórroga de fútbol y 
   assert.equal(ten('ml', 0, null, [[6, 2], [1, 0]], { retired: true }).status, 'nula');
   assert.equal(soc('1x2', 0, null, 0, 0, 'STATUS_POSTPONED').reason, 'Partido aplazado o cancelado');
   assert.equal(soc('1x2', 0, null, 2, 1, 'STATUS_FINAL_AET').status, 'nula');
+  // Penales: con prórroga (aet true) o sin saberlo, nula; directo a penales (aet false) cuenta el marcador de los 90.
+  const pen = (aet) => gradePick({ sport: 'soccer', market: 'ou', side: 0, line: 1.5 }, { home: 1, away: 1, name: 'STATUS_FINAL_PEN', aet });
+  assert.equal(pen(true).status, 'nula');
+  assert.equal(pen(undefined).status, 'nula');
+  assert.equal(pen(false).status, 'ganada');
   assert.equal(gradePick({ sport: 'basketball', market: 'ml', side: 0 }, { home: 100, away: 90, name: 'STATUS_FINAL_OT' }).status, 'ganada'); // básquet cuenta la prórroga
   assert.equal(scoreOf({ home: 2, away: 1 }), '2-1');
   assert.equal(scoreOf({ sets }), '7-6 3-6 6-4');

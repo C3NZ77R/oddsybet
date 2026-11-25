@@ -38,6 +38,8 @@ test('norm y parseNum', () => {
   assert.equal(parseNum('−110'), -110);
   assert.equal(parseNum(8.5), 8.5);
   assert.equal(parseNum(null), null);
+  assert.equal(parseNum('Más de .5'), 0.5); // antes salía 5
+  assert.equal(parseNum('-.5'), -0.5);
 });
 
 // Partido de hoy: Lakers (visitante) en Denver.
@@ -103,4 +105,12 @@ test('matchLegs: apellidos con Jr. o III y dos partidos entre los mismos equipos
   const later = { ...game('pre'), id: '403', start: '2026-11-07T02:00:00Z' };
   assert.equal(matchLegs([raw({ player: 'Jokic' })], [ended, later, next], rosters)[0].gameId, '402'); // el próximo sin terminar
   assert.equal(matchLegs([raw({ player: 'Jokic' })], [ended], rosters)[0].reason, 'El partido ya terminó'); // solo hay uno y ya terminó
+});
+
+test('matchLegs: piernas malformadas de Gemini no tumban la lectura (null, teams como texto, tope de 30)', () => {
+  const out = matchLegs([null, 'x', [], raw({ player: 'N. Jokic', teams: 'Lakers' }), raw({ player: 'N. Jokic', team: 7, text: 5 })], [game()], rosters);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].tracked, true, out[0].reason); // sin equipos legibles, el partido es el del jugador
+  assert.equal(out[1].label, 'Jokić · Más de 24.5 puntos');
+  assert.equal(matchLegs(Array.from({ length: 40 }, () => raw({ player: 'N. Jokic' })), [game()], rosters).length, 30);
 });
