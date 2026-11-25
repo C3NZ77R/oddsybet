@@ -3,7 +3,7 @@
 import { h, raw, empty, fmtOdds } from '../ui.js';
 import { STATS } from '../stats.js';
 import { store } from '../store.js';
-import { pushSupport, enablePush, shrinkImage, trackApi } from '../track.js';
+import { pushSupport, enablePush, shrinkImage, takeSharedTicket, trackApi } from '../track.js';
 
 const REFRESH_MS = 15_000;
 const MARKETS = { ml: 'Ganador', spread: 'Hándicap', total: 'Total de puntos', prop: 'Prop de jugador' };
@@ -197,6 +197,18 @@ export default {
         else paintAdd();
       }
     }
+    async function readImage(file) {
+      busy = true; addMsg = ''; paintAdd();
+      let image;
+      try { image = await shrinkImage(file); } catch (err) { busy = false; addMsg = err.message; return paintAdd(); }
+      return read({ image });
+    }
+    // Pantallazo compartido desde Betano u otra app: sin avisos activos espera en caché hasta que se activen.
+    async function readShared() {
+      if (!active() || busy) return;
+      const file = await takeSharedTicket().catch(() => null);
+      if (file) await readImage(file);
+    }
     const rowOf = (target) => rows?.find((r) => r.key === Number(target.closest('[data-row]')?.dataset.row));
 
     el.addEventListener('click', async (e) => {
@@ -204,7 +216,8 @@ export default {
       if (t.closest('[data-enable]')) {
         pushErr = '';
         try { await enablePush(); } catch (err) { pushErr = err.message; }
-        return paintAll();
+        paintAll();
+        return readShared();
       }
       if (t.closest('[data-paste]')) { const box = $('[data-pastebox]'); box.hidden = !box.hidden; if (!box.hidden) $('[data-text]').focus(); return; }
       if (t.closest('[data-read-text]')) { const text = $('[data-text]').value.trim(); if (text) read({ text }); return; }
@@ -245,12 +258,7 @@ export default {
     });
     el.addEventListener('change', async (e) => {
       const t = e.target;
-      if (t.matches('[data-file]') && t.files?.[0]) {
-        busy = true; addMsg = ''; paintAdd();
-        let image;
-        try { image = await shrinkImage(t.files[0]); } catch (err) { busy = false; addMsg = err.message; return paintAdd(); }
-        return read({ image });
-      }
+      if (t.matches('[data-file]') && t.files?.[0]) return readImage(t.files[0]);
       if (t.tagName !== 'SELECT' || !t.dataset.f) return;
       const r = rowOf(t);
       if (!r) return;
@@ -271,6 +279,7 @@ export default {
 
     const off = store.on('track', paintAll); // un 401 borra el dispositivo: vuelve el botón de activar
     paintAll();
+    readShared();
     const refresh = setInterval(() => { if (!document.hidden && active()) paintList(); }, REFRESH_MS);
     return () => { clearInterval(refresh); off(); };
   },

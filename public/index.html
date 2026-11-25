@@ -82,5 +82,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script type="module" src="app.js"></script>
+  <!-- Al cargar y no solo al activar avisos: así el celular puede instalar Oddsy y recibir pantallazos compartidos. -->
+  <script>navigator.serviceWorker?.register('/sw.js').catch(() => {});</script>
 </body>
 </html>

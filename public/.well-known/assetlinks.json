@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "bet.oddsy.app",
+      "sha256_cert_fingerprints": ["52:0B:4D:5E:29:C6:22:F1:30:D7:8A:E3:B9:DE:2B:6B:DD:F7:CB:5D:22:EE:53:13:1D:F1:61:0D:B8:72:73:87"]
+    }
+  }
+]

@@ -271,7 +271,11 @@ test('PWA: manifiesto, íconos en disco, enlaces en index.html y service worker 
   const sw = readFileSync(pub('sw.js'), 'utf8');
   assert.match(sw, /addEventListener\('push'/);
   assert.match(sw, /addEventListener\('notificationclick'/);
-  assert.doesNotMatch(sw, /addEventListener\('fetch'/); // sin caché offline
+  assert.doesNotMatch(sw, /caches\.match\(event\.request/); // sin caché offline: el fetch solo atiende el pantallazo compartido
+  assert.ok(sw.includes(`SHARE_PATH = '${m.share_target.action}'`), 'share_target apunta a la ruta que atiende sw.js');
+  assert.equal(m.share_target.params.files[0].name, 'ticket');
+  for (const s of m.shortcuts) assert.match(s.url, /^\/#\/nba\/(picks|seguir|live)$/);
+  assert.match(html, /serviceWorker\?\.register\('\/sw\.js'\)/); // al cargar: instalable y listo para recibir pantallazos
   assert.match(sw, /clients\.claim\(\)/); // navigate() del clic necesita controlar la página abierta
 });
 

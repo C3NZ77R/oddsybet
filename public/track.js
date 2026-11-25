@@ -93,6 +93,16 @@ export async function shrinkImage(file) {
   throw new Error('La foto es muy pesada incluso reducida. Recórtala y vuelve a intentar.');
 }
 
+// Pantallazo que otra app le compartió a Oddsy (lo guarda sw.js): se entrega una sola vez y se borra.
+export async function takeSharedTicket() {
+  if (!('caches' in window)) return null;
+  const cache = await caches.open('oddsy-share');
+  const res = await cache.match('/ticket-compartido');
+  if (!res) return null;
+  await cache.delete('/ticket-compartido');
+  return res.blob();
+}
+
 export const trackApi = {
   read: (input) => call('POST', 'read', input),
   createBet: (bet) => call('POST', 'bets', bet),

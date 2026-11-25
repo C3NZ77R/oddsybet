@@ -83,3 +83,35 @@ test('trackApi: una petición colgada se corta a los 30 s con un error claro', a
     await assert.rejects(p, /tardó demasiado/);
   } finally { globalThis.fetch = real; }
 });
+
+test('pantallazo compartido: sw.js lo guarda, redirige a Mis apuestas y takeSharedTicket lo entrega una sola vez', async (t) => {
+  const { readFileSync } = await import('node:fs');
+  const vm = await import('node:vm');
+  const { takeSharedTicket } = await import('../public/track.js');
+  const stores = new Map();
+  const caches = { open: async (name) => {
+    if (!stores.has(name)) stores.set(name, new Map());
+    const m = stores.get(name);
+    return { put: async (k, r) => { m.set(k, r); }, match: async (k) => m.get(k), delete: async (k) => m.delete(k) };
+  } };
+  const listeners = {};
+  const self = { addEventListener: (type, fn) => { listeners[type] = fn; }, location: { origin: 'https://oddsybet.vercel.app' } };
+  vm.runInNewContext(readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8'), { self, caches, URL, Response, File });
+
+  const fire = (request) => { let res; listeners.fetch({ request, respondWith: (p) => { res = p; } }); return res; };
+  assert.equal(fire(new Request('https://oddsybet.vercel.app/api/games')), undefined); // el resto va a la red
+
+  const body = new FormData();
+  body.append('ticket', new File(['png'], 'boleto.png', { type: 'image/png' }));
+  const res = await fire(new Request('https://oddsybet.vercel.app/compartir-ticket', { method: 'POST', body }));
+  assert.equal(res.status, 303);
+  assert.equal(new URL(res.headers.get('location'), 'https://x').hash, '#/nba/seguir');
+
+  const hadWindow = 'window' in globalThis;
+  globalThis.caches = caches;
+  globalThis.window ??= globalThis;
+  t.after(() => { delete globalThis.caches; if (!hadWindow) delete globalThis.window; });
+  const blob = await takeSharedTicket();
+  assert.equal(await blob.text(), 'png');
+  assert.equal(await takeSharedTicket(), null);
+});

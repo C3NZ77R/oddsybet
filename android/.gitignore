@@ -1,0 +1,5 @@
+# Proyecto que genera Bubblewrap desde twa-manifest.json: solo se guarda la configuración.
+# La llave de firma vive fuera del repo, en ~/.oddsy-android/.
+/*
+!/.gitignore
+!/twa-manifest.json

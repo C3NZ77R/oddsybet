@@ -1,7 +1,25 @@
-// Service worker de Oddsy: solo los avisos de las apuestas seguidas. Sin caché offline ni manejo de fetch.
+// Service worker de Oddsy: los avisos de las apuestas seguidas y recibir el pantallazo compartido desde otra app
+// (share_target del manifiesto). Sin caché offline: el único fetch que atiende es ese POST.
+// Los mismos nombres usa takeSharedTicket en track.js.
+const SHARE_PATH = '/compartir-ticket', SHARE_CACHE = 'oddsy-share', SHARED_TICKET = '/ticket-compartido';
+
 self.addEventListener('install', () => self.skipWaiting());
 // Sin claim(), la página que activó los avisos no queda controlada hasta recargar y navigate() del clic falla.
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+
+// Compartir un pantallazo a Oddsy: se guarda en Cache Storage y Mis apuestas lo lee al abrir (takeSharedTicket).
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'POST' || url.pathname !== SHARE_PATH) return;
+  event.respondWith((async () => {
+    const file = (await event.request.formData()).get('ticket');
+    if (file instanceof File && file.type.startsWith('image/')) {
+      const cache = await caches.open(SHARE_CACHE);
+      await cache.put(SHARED_TICKET, new Response(file, { headers: { 'content-type': file.type } }));
+    }
+    return Response.redirect(new URL('/#/nba/seguir', self.location.origin).href, 303);
+  })());
+});
 
 self.addEventListener('push', (event) => {
   let msg = {};
